@@ -1,0 +1,46 @@
+# vim: set ft=yaml:
+#
+#
+
+# listen port
+port: 2022
+
+# the key to encrypt the transport data
+obfs_key: some_keyword
+
+# ssh host key file
+host_key_file: ssh_host_rsa_key
+
+# the method to encrypt the transport data
+# avaiable methods: rc4, aes, none or ""
+# none or "" means disable the obfs encrypt
+#obfs_method: rc4
+obfs_method: "rc4"
+
+# show more log message
+# value true or false
+debug: true
+
+# the users used by ssh server
+# user can authorite by passwrod or by public key
+# public key as same as OpenSSH
+# public key or password must be specify one
+#
+users:
+    - 
+      # username
+      username: user1
+      # password, empty password means disable password authorize
+      password: ""
+      # public key file
+      authorized_key_file: /path/to/user/authorized_keys
+    - 
+      username: user2
+      password: user2
+      authorized_key_file: /path/to/user/authorized_keys
+    - 
+      username: user3
+      password: ""
+      authorized_key_file: /path/to/authorized_keys
+
+
