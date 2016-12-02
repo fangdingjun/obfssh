@@ -26,11 +26,13 @@ type Server struct {
 //
 // key is obfs encrypt key
 //
+// conf is the server configure
+//
 // if set method to none or "", means disable obfs encryption, when the obfs is disabled,
 // the server can accept connection from standard ssh client, like OpenSSH client
 //
-func NewServer(c net.Conn, config *ssh.ServerConfig, method, key string) (*Server, error) {
-	wc, err := NewObfsConn(c, method, key, true)
+func NewServer(c net.Conn, config *ssh.ServerConfig, conf *Conf) (*Server, error) {
+	wc, err := NewObfsConn(c, conf.ObfsMethod, conf.ObfsKey, true)
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +40,11 @@ func NewServer(c net.Conn, config *ssh.ServerConfig, method, key string) (*Serve
 	if err != nil {
 		return nil, err
 	}
-	//wc.DisableObfs()
+
+	if conf.DisableObfsAfterHandshake {
+		wc.DisableObfs()
+	}
+
 	sc := &Server{conn: c,
 		sshConn:        sshConn,
 		forwardedPorts: map[string]net.Listener{},

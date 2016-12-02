@@ -1,27 +1,20 @@
 package main
 
 import (
-	//"bytes"
 	"flag"
 	"fmt"
+	"github.com/bgentry/speakeasy"
 	"github.com/fangdingjun/obfssh"
 	"github.com/golang/crypto/ssh"
 	"github.com/golang/crypto/ssh/agent"
-	//"github.com/golang/crypto/ssh/terminal"
-	"time"
-	//"io"
 	"io/ioutil"
 	"log"
 	"net"
 	"os"
-	//"os/signal"
 	"path/filepath"
 	"strings"
-	//"sync"
-	//"syscall"
+	"time"
 )
-
-var method, encryptKey string
 
 type stringSlice []string
 
@@ -42,15 +35,17 @@ func (lf *stringSlice) String() string {
 	return s
 }
 
-var localForwards stringSlice
-var remoteForwards stringSlice
-var dynamicForwards stringSlice
-
 func main() {
 	var host, port, user, pass, key string
-	//var localForward, remoteForward, dynamicForward string
+	var method, encryptKey string
 	var notRunCmd bool
 	var debug bool
+	var disableObfsAfterHandshake bool
+	var keepAliveInterval, keepAliveMax int
+
+	var localForwards stringSlice
+	var remoteForwards stringSlice
+	var dynamicForwards stringSlice
 
 	flag.StringVar(&user, "l", os.Getenv("USER"), "ssh username")
 	flag.StringVar(&pass, "pw", "", "ssh password")
@@ -63,19 +58,23 @@ func main() {
 	flag.StringVar(&method, "obfs_method", "", "transport encrypt method, avaliable: rc4, aes, empty means disable encrypt")
 	flag.StringVar(&encryptKey, "obfs_key", "", "transport encrypt key")
 	flag.BoolVar(&debug, "d", false, "verbose mode")
+	flag.IntVar(&keepAliveInterval, "keepalive_interval", 10, "keep alive interval")
+	flag.IntVar(&keepAliveMax, "keepalive_max", 5, "keep alive max")
+	flag.BoolVar(&disableObfsAfterHandshake, "disalbe_obfs_after_handshake", false, "disable obfs after handshake")
 	flag.Parse()
 
 	if debug {
 		obfssh.SSHLogLevel = obfssh.DEBUG
 	}
+
 	auth := []ssh.AuthMethod{}
+
+	var agentConn net.Conn
+	var err error
 
 	// read ssh agent and default auth key
 	if pass == "" && key == "" {
-		if aconn, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK")); err == nil {
-			obfssh.Log(obfssh.DEBUG, "add auth method with agent %s", os.Getenv("SSH_AUTH_SOCK"))
-			auth = append(auth, ssh.PublicKeysCallback(agent.NewClient(aconn).Signers))
-		}
+		var pkeys []ssh.Signer
 
 		home := os.Getenv("HOME")
 		for _, f := range []string{
@@ -89,9 +88,25 @@ func main() {
 			if pemBytes, err := ioutil.ReadFile(k1); err == nil {
 				if priKey, err := ssh.ParsePrivateKey(pemBytes); err == nil {
 					obfssh.Log(obfssh.DEBUG, "add private key: %s", k1)
-					auth = append(auth, ssh.PublicKeys(priKey))
+					//auth = append(auth, ssh.PublicKeys(priKey))
+					pkeys = append(pkeys, priKey)
 				}
 			}
+		}
+
+		if len(pkeys) != 0 {
+			obfssh.Log(obfssh.DEBUG, "private key length %d", len(pkeys))
+			auth = append(auth, ssh.PublicKeys(pkeys...))
+		}
+
+		agentConn, err = net.Dial("unix", os.Getenv("SSH_AUTH_SOCK"))
+		if err == nil {
+			defer agentConn.Close()
+			obfssh.Log(obfssh.DEBUG, "add auth method with agent %s", os.Getenv("SSH_AUTH_SOCK"))
+			agentClient := agent.NewClient(agentConn)
+			auth = append(auth, ssh.PublicKeysCallback(agentClient.Signers))
+		} else {
+			obfssh.Log(obfssh.DEBUG, "connect to agent failed")
 		}
 	}
 
@@ -115,11 +130,7 @@ func main() {
 		host = ss[1]
 	}
 
-	if pass != "" {
-		obfssh.Log(obfssh.DEBUG, "add password auth method")
-		auth = append(auth, ssh.Password(pass))
-	}
-
+	// process user specified private key
 	if key != "" {
 		pemBytes, err := ioutil.ReadFile(key)
 		if err != nil {
@@ -133,23 +144,48 @@ func main() {
 		auth = append(auth, ssh.PublicKeys(priKey))
 	}
 
+	if pass != "" {
+		obfssh.Log(obfssh.DEBUG, "add password auth method")
+		auth = append(auth, ssh.Password(pass))
+	} else {
+		obfssh.Log(obfssh.DEBUG, "add keyboard interactive auth")
+		//auth = append(auth,
+		//		ssh.RetryableAuthMethod(ssh.KeyboardInteractive(keyboardAuth), 3))
+		auth = append(auth,
+			ssh.RetryableAuthMethod(ssh.PasswordCallback(passwordAuth), 3))
+	}
+
 	config := &ssh.ClientConfig{
 		User:    user,
 		Auth:    auth,
 		Timeout: 10 * time.Second,
 	}
 
-	h := net.JoinHostPort(host, port)
-	c, err := net.Dial("tcp", h)
+	rhost := net.JoinHostPort(host, port)
+
+	c, err := net.Dial("tcp", rhost)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	client, err := obfssh.NewClient(c, config, h, method, encryptKey)
+	conf := &obfssh.Conf{
+		ObfsMethod:                method,
+		ObfsKey:                   encryptKey,
+		Timeout:                   time.Duration(keepAliveInterval+5) * time.Second,
+		KeepAliveInterval:         time.Duration(keepAliveInterval) * time.Second,
+		KeepAliveMax:              keepAliveMax,
+		DisableObfsAfterHandshake: disableObfsAfterHandshake,
+	}
+
+	client, err := obfssh.NewClient(c, config, rhost, conf)
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	var local, remote string
+
+	// process port forward
+
 	for _, p := range localForwards {
 		addr := parseForwardAddr(p)
 		if len(addr) != 4 && len(addr) != 3 {
@@ -225,4 +261,27 @@ func parseForwardAddr(s string) []string {
 		return false
 	})
 	return ss
+}
+
+/*
+func keyboardAuth(user, instruction string, question []string, echos []bool) (answers []string, err error) {
+	if len(question) == 0 {
+		fmt.Printf("%s %s\n", user, instruction)
+		return nil, nil
+	}
+	r := bufio.NewReader(os.Stdin)
+	var s string
+	for i := range question {
+		fmt.Printf("%s ", question[i])
+		s, err = r.ReadString('\n')
+		answers = append(answers, s)
+	}
+	return
+}
+*/
+
+func passwordAuth() (string, error) {
+	// read password from console
+	s, err := speakeasy.Ask("Password: ")
+	return strings.Trim(s, " \r\n"), err
 }

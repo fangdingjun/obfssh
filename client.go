@@ -28,12 +28,14 @@ type Client struct {
 //
 // key is obfs encrypt key
 //
+// conf is the client configure
+//
 // if set method to none or "", means disable the obfs,
 // when the obfs is disabled, the client can connect to standard ssh server, like OpenSSH server
 //
-func NewClient(c net.Conn, config *ssh.ClientConfig, addr, method, key string) (*Client, error) {
-	Log(DEBUG, "create obfs conn with method %s", method)
-	obfsConn, err := NewObfsConn(&TimedOutConn{c, 15 * time.Second}, method, key, false)
+func NewClient(c net.Conn, config *ssh.ClientConfig, addr string, conf *Conf) (*Client, error) {
+	Log(DEBUG, "create obfs conn with method %s", conf.ObfsMethod)
+	obfsConn, err := NewObfsConn(&TimedOutConn{c, conf.Timeout}, conf.ObfsMethod, conf.ObfsKey, false)
 	if err != nil {
 		return nil, err
 	}
@@ -41,12 +43,17 @@ func NewClient(c net.Conn, config *ssh.ClientConfig, addr, method, key string) (
 	if err != nil {
 		return nil, err
 	}
+
+	if conf.DisableObfsAfterHandshake {
+		obfsConn.DisableObfs()
+	}
+
 	sshClient := ssh.NewClient(sshConn, newch, reqs)
 	client := &Client{
 		conn: c, sshConn: sshConn, client: sshClient,
 		ch: make(chan int),
 	}
-	go client.keepAlive(10*time.Second, 4)
+	go client.keepAlive(conf.KeepAliveInterval, conf.KeepAliveMax)
 	return client, nil
 }
 

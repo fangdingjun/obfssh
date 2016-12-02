@@ -28,6 +28,12 @@ func main() {
 		obfssh.SSHLogLevel = obfssh.DEBUG
 	}
 
+	sconf := &obfssh.Conf{
+		ObfsMethod:                conf.Method,
+		ObfsKey:                   conf.Key,
+		DisableObfsAfterHandshake: conf.DisableObfsAfterHandshake,
+	}
+
 	config := &ssh.ServerConfig{
 		PasswordCallback: func(c ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
 			if u, err := conf.getUser(c.User()); err == nil {
@@ -86,7 +92,7 @@ func main() {
 		obfssh.Log(obfssh.DEBUG, "accept tcp connection from %s", c.RemoteAddr())
 
 		go func(c net.Conn) {
-			sc, err := obfssh.NewServer(c, config, conf.Method, conf.Key)
+			sc, err := obfssh.NewServer(c, config, sconf)
 			if err != nil {
 				c.Close()
 				obfssh.Log(obfssh.ERROR, "%s", err.Error())

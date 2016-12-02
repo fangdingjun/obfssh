@@ -17,6 +17,9 @@ host_key_file: ssh_host_rsa_key
 #obfs_method: rc4
 obfs_method: "rc4"
 
+# when set to true, only the ssh handshake packet is encrypted
+disable_obfs_after_handshake: true
+
 # show more log message
 # value true or false
 debug: true

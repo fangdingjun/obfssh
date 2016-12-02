@@ -9,12 +9,13 @@ import (
 )
 
 type serverConfig struct {
-	Port    int          `yaml:"port"`
-	Key     string       `yaml:"obfs_key"`
-	Debug   bool         `yaml:"debug"`
-	HostKey string       `yaml:"host_key_file"`
-	Method  string       `yaml:"obfs_method"`
-	Users   []serverUser `yaml:"users"`
+	Port                      int          `yaml:"port"`
+	Key                       string       `yaml:"obfs_key"`
+	Debug                     bool         `yaml:"debug"`
+	HostKey                   string       `yaml:"host_key_file"`
+	Method                    string       `yaml:"obfs_method"`
+	DisableObfsAfterHandshake bool         `yaml:"disable_obfs_after_handshake"`
+	Users                     []serverUser `yaml:"users"`
 }
 
 type serverUser struct {
