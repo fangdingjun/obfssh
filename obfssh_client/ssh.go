@@ -60,7 +60,7 @@ func main() {
 	flag.BoolVar(&debug, "d", false, "verbose mode")
 	flag.IntVar(&keepAliveInterval, "keepalive_interval", 10, "keep alive interval")
 	flag.IntVar(&keepAliveMax, "keepalive_max", 5, "keep alive max")
-	flag.BoolVar(&disableObfsAfterHandshake, "disalbe_obfs_after_handshake", false, "disable obfs after handshake")
+	flag.BoolVar(&disableObfsAfterHandshake, "disable_obfs_after_handshake", false, "disable obfs after handshake")
 	flag.Parse()
 
 	if debug {
