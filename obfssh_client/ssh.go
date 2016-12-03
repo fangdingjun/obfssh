@@ -36,7 +36,8 @@ func (lf *stringSlice) String() string {
 }
 
 func main() {
-	var host, port, user, pass, key string
+	var host, user, pass, key string
+	var port int
 	var method, encryptKey string
 	var notRunCmd bool
 	var debug bool
@@ -47,9 +48,12 @@ func main() {
 	var remoteForwards stringSlice
 	var dynamicForwards stringSlice
 
+	var configfile string
+
+	flag.StringVar(&configfile, "f", "", "configure file")
 	flag.StringVar(&user, "l", os.Getenv("USER"), "ssh username")
 	flag.StringVar(&pass, "pw", "", "ssh password")
-	flag.StringVar(&port, "p", "22", "remote port")
+	flag.IntVar(&port, "p", 22, "remote port")
 	flag.StringVar(&key, "i", "", "private key file")
 	flag.Var(&localForwards, "L", "forward local port to remote, format [local_host:]local_port:remote_host:remote_port")
 	flag.Var(&remoteForwards, "R", "forward remote port to local, format [remote_host:]remote_port:local_host:local_port")
@@ -62,6 +66,57 @@ func main() {
 	flag.IntVar(&keepAliveMax, "keepalive_max", 5, "keep alive max")
 	flag.BoolVar(&disableObfsAfterHandshake, "disable_obfs_after_handshake", false, "disable obfs after handshake")
 	flag.Parse()
+
+	if configfile != "" {
+		if c, err := loadConfig(configfile); err == nil {
+			if c.Host != "" {
+				host = c.Host
+			}
+			if c.Username != "" {
+				user = c.Username
+			}
+			if c.Password != "" {
+				pass = c.Password
+			}
+			if c.Port != 0 {
+				port = c.Port
+			}
+			if c.PrivateKey != "" {
+				key = c.PrivateKey
+			}
+			if c.ObfsMethod != "" {
+				method = c.ObfsMethod
+			}
+			if c.ObfsKey != "" {
+				encryptKey = c.ObfsKey
+			}
+			if c.Debug {
+				debug = c.Debug
+			}
+			if c.DisableObfsAfterHandshake {
+				disableObfsAfterHandshake = c.DisableObfsAfterHandshake
+			}
+			if c.NotRunCmd {
+				notRunCmd = c.NotRunCmd
+			}
+			if c.KeepaliveInterval != 0 {
+				keepAliveInterval = c.KeepaliveInterval
+			}
+			if c.KeepaliveMax != 0 {
+				keepAliveMax = c.KeepaliveMax
+			}
+
+			if len(c.LocalForward) != 0 {
+				localForwards = append(localForwards, c.LocalForward...)
+			}
+			if len(c.RemoteForward) != 0 {
+				remoteForwards = append(remoteForwards, c.RemoteForward...)
+			}
+			if len(c.DynamicForward) != 0 {
+				dynamicForwards = append(dynamicForwards, c.DynamicForward...)
+			}
+		}
+	}
 
 	if debug {
 		obfssh.SSHLogLevel = obfssh.DEBUG
@@ -112,16 +167,20 @@ func main() {
 
 	args := flag.Args()
 	var cmd string
-	switch len(args) {
-	case 0:
-		flag.PrintDefaults()
-		log.Fatal("you must specify the remote host")
-	case 1:
-		host = args[0]
-		cmd = ""
-	default:
-		host = args[0]
-		cmd = strings.Join(args[1:], " ")
+	if host == "" {
+		switch len(args) {
+		case 0:
+			flag.PrintDefaults()
+			log.Fatal("you must specify the remote host")
+		case 1:
+			host = args[0]
+			cmd = ""
+		default:
+			host = args[0]
+			cmd = strings.Join(args[1:], " ")
+		}
+	} else {
+		cmd = strings.Join(args, " ")
 	}
 
 	if strings.Contains(host, "@") {
@@ -161,7 +220,7 @@ func main() {
 		Timeout: 10 * time.Second,
 	}
 
-	rhost := net.JoinHostPort(host, port)
+	rhost := net.JoinHostPort(host, fmt.Sprintf("%d", port))
 
 	c, err := net.Dial("tcp", rhost)
 	if err != nil {

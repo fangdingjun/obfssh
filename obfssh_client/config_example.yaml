@@ -1,0 +1,54 @@
+
+# vim: set ft=yaml:
+
+# the server address
+host: ssh.example.com
+
+# the server port
+port: 2223
+
+# obfs encrypt method, rc4, aes or none, same as server
+obfs_method: rc4
+
+# obfs encrypt key, same as server
+obfs_key: some_keyword
+
+# ssh username at remote
+username: user1
+
+# ssh password
+password: 1234
+
+# keep alive interval
+keepalive_interval: 15
+
+# max error on keep alive
+# when error meet max count, will close the connection
+keepalive_max: 5
+
+# private key to auth user on remote
+private_key: /home/user1/.ssh/id_rsa
+
+# debug
+debug: false
+
+# not run cmd or start shell on remote
+not_run_cmd: true
+
+# disable obfs after ssh handshake
+disable_obfs_after_handshake: true
+
+# local port forward, forword local port to remote host
+local_forward:
+    - :3311:127.0.0.1:3121
+    - 127.0.0.1:3121:10.0.0.1:1223
+
+# remote port forward, forward remote port to local host
+remote_forward:
+    - :3123:127.0.0.1:4322
+    - :3124:10.0.0.1:2212
+
+# dynamic forward port to remote host
+dynamic_forward:
+    - :3224
+    - 127.0.0.1:9883
