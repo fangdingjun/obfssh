@@ -3,7 +3,7 @@ package main
 import (
 	"bytes"
 	"github.com/go-yaml/yaml"
-	"github.com/golang/crypto/ssh"
+	"golang.org/x/crypto/ssh"
 	"io/ioutil"
 	"log"
 )

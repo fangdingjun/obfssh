@@ -5,7 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/fangdingjun/obfssh"
-	"github.com/golang/crypto/ssh"
+	"golang.org/x/crypto/ssh"
 	"io/ioutil"
 	"log"
 	"net"

@@ -2,8 +2,8 @@ package obfssh
 
 import (
 	socks "github.com/fangdingjun/socks-go"
-	"github.com/golang/crypto/ssh"
-	"github.com/golang/crypto/ssh/terminal"
+	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/terminal"
 	"net"
 	"os"
 	"os/signal"

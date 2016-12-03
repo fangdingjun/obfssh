@@ -2,8 +2,8 @@ package obfssh
 
 import (
 	"fmt"
-	"github.com/golang/crypto/ssh"
-	"github.com/golang/crypto/ssh/terminal"
+	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/terminal"
 	//"log"
 	"net"
 )
