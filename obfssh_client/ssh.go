@@ -131,6 +131,7 @@ func main() {
 	if pass == "" && key == "" {
 		var pkeys []ssh.Signer
 
+		// read default ssh private
 		home := os.Getenv("HOME")
 		for _, f := range []string{
 			".ssh/id_rsa",
@@ -149,20 +150,28 @@ func main() {
 			}
 		}
 
-		if len(pkeys) != 0 {
-			obfssh.Log(obfssh.DEBUG, "private key length %d", len(pkeys))
-			auth = append(auth, ssh.PublicKeys(pkeys...))
-		}
-
+		// auth with agent
 		agentConn, err = net.Dial("unix", os.Getenv("SSH_AUTH_SOCK"))
 		if err == nil {
 			defer agentConn.Close()
 			obfssh.Log(obfssh.DEBUG, "add auth method with agent %s", os.Getenv("SSH_AUTH_SOCK"))
 			agentClient := agent.NewClient(agentConn)
-			auth = append(auth, ssh.PublicKeysCallback(agentClient.Signers))
+			//auth = append(auth, ssh.PublicKeysCallback(agentClient.Signers))
+			signers, err := agentClient.Signers()
+			if err == nil {
+				pkeys = append(pkeys, signers...)
+			} else {
+				obfssh.Log(obfssh.DEBUG, "get key from agent failed: %s", err)
+			}
 		} else {
 			obfssh.Log(obfssh.DEBUG, "connect to agent failed")
 		}
+
+		if len(pkeys) != 0 {
+			obfssh.Log(obfssh.DEBUG, "private key length %d", len(pkeys))
+			auth = append(auth, ssh.PublicKeys(pkeys...))
+		}
+
 	}
 
 	args := flag.Args()
