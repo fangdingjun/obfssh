@@ -15,7 +15,7 @@ run server
 
     vim config.yaml
 
-    ssh-keygen -f ssh_host_rsa_key -t rsa 1024
+    ssh-keygen -f ssh_host_rsa_key -t rsa
 
     $GOPATH/bin/obfssh_server -c config.yaml
 
