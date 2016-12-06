@@ -57,6 +57,11 @@ func NewClient(c net.Conn, config *ssh.ClientConfig, addr string, conf *Conf) (*
 	return client, nil
 }
 
+// Client return *ssh.Client
+func (cc *Client) Client() *ssh.Client {
+	return cc.client
+}
+
 // Run wait ssh connection to finish
 func (cc *Client) Run() {
 	select {
