@@ -172,7 +172,7 @@ func (sc *Server) handleSession(newch ssh.NewChannel) {
 			ret = false
 		}
 
-		Log(DEBUG, "session request %s, reply %q", r.Type, ret)
+		Log(DEBUG, "session request %s, reply %v", r.Type, ret)
 
 		if r.WantReply {
 			r.Reply(ret, nil)
