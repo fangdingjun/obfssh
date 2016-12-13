@@ -255,7 +255,7 @@ func (cc *Client) handleRemoteForward(conn net.Conn, local string) {
 }
 
 func (cc *Client) handleDynamicForward(conn net.Conn) {
-	s := socks.SocksConn{conn, cc.client.Dial}
+	s := socks.SocksConn{ClientConn: conn, Dial: cc.client.Dial}
 	s.Serve()
 }
 
