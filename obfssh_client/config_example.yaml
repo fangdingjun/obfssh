@@ -1,54 +1,139 @@
 
 # vim: set ft=yaml:
 
+# host
+#
 # the server address
-host: ssh.example.com
 
+# host: ssh.example.com
+
+
+# port
+# 
 # the server port
-port: 2223
 
-# obfs encrypt method, rc4, aes or none, same as server
-obfs_method: rc4
+# port: 2223
 
-# obfs encrypt key, same as server
-obfs_key: some_keyword
 
-# ssh username at remote
-username: user1
+# obfs_method
+#
+# Specifies the encryption method.
+# when this option is specified, the entire connection 
+# will be encrypted.
+# when set to none, the encryption is disabled.
+# Avaliable methods: rc4, aes, none(default)
 
-# ssh password
-password: 1234
+# obfs_method: rc4
 
-# keep alive interval
-keepalive_interval: 15
 
-# max error on keep alive
-# when error meet max count, will close the connection
-keepalive_max: 5
+# obfs_key
+#
+# Specifies the key to encrypt the connection,
+# if the server enable the obfs, only known the
+# right key can connect to the server.
 
-# private key to auth user on remote
-private_key: /home/user1/.ssh/id_rsa
+#obfs_key: some_keyword
+
+
+# username
+#
+# specifies the user to log in as on the remote machine.
+
+# username: user1
+
+
+# password
+#
+# Specifies the password for log in remote machine
+
+# password: 1234
+
+
+# keepalive_interval
+#
+# Specifies the interval of keep alive message,
+# the interval is integer in seconds.
+
+# keepalive_interval: 15
+
+
+# keepalive_max
+#
+# Specifies the max error count for keep alive,
+# when the count reach the max, the connection will
+# be abort.
+ 
+# keepalive_max: 5
+
+
+# private_key
+#
+# Specifies a identity(private key) for public key authentication.
+
+# private_key: /home/user1/.ssh/id_rsa
+
 
 # debug
-debug: false
+#
+# verbose mode
 
-# not run cmd or start shell on remote
-not_run_cmd: true
+# debug: false
 
+
+# not_run_cmd
+#
+# Do not execute commannd or start shell on remote machine.
+# This is useful for just port forwarding.
+
+# not_run_cmd: true
+
+
+# disable_obfs_after_handshake
+#
 # disable obfs after ssh handshake
-disable_obfs_after_handshake: true
+# when this option is specified, only encrypt the
+# ssh handshake message.
 
-# local port forward, forword local port to remote host
-local_forward:
-    - :3311:127.0.0.1:3121
-    - 127.0.0.1:3121:10.0.0.1:1223
+# disable_obfs_after_handshake: true
 
-# remote port forward, forward remote port to local host
-remote_forward:
-    - :3123:127.0.0.1:4322
-    - :3124:10.0.0.1:2212
 
-# dynamic forward port to remote host
-dynamic_forward:
-    - :3224
-    - 127.0.0.1:9883
+# local_forward
+#
+# Listen a port on local side, when a connection is made to
+# this port, the connection is forwared over the secure 
+# channel to host:portport from the remote machine.
+# This option can be specified multiple times.
+# format [bind_address:]port:host:hostport
+
+#local_forward:
+#    - :3311:127.0.0.1:3121
+#    - 127.0.0.1:3121:10.0.0.1:1223
+
+
+# remote_forward
+#
+# Listen a port on remote machine, when a connection is 
+# made to that port, the connection is forwarded over
+# the secure channel to host:hostport from the local machine.
+# This option can be specified multiple times.
+# format [bind_address:]port:host:hostport
+
+# remote_forward:
+#   - :3123:127.0.0.1:4322
+#    - :3124:10.0.0.1:2212
+
+
+# dynamic_forward
+#
+# Specifies a local dynamic application-level port
+# forwarding. This listen a port on the local side
+# and act as socks server, when a connection is made
+# to this port, the connection is forwarded over 
+# the secure channel, the distination is determined
+# by socks protocol.
+# This option can be specified multiple times.
+# format [bind_adress:]port
+
+# dynamic_forward:
+#    - :3224
+#    - 127.0.0.1:9883
