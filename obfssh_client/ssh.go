@@ -39,7 +39,7 @@ func main() {
 	flag.Parse()
 
 	if configfile != "" {
-		if err := loadConfig(&cfg, configfile); err == nil {
+		if err := loadConfig(&cfg, configfile); err != nil {
 			log.Fatal(err)
 		}
 	}
