@@ -16,109 +16,35 @@ import (
 	"time"
 )
 
-type stringSlice []string
-
-func (lf *stringSlice) Set(val string) error {
-	*lf = append(*lf, val)
-	return nil
-}
-
-func (lf *stringSlice) String() string {
-	s := ""
-	if lf == nil {
-		return s
-	}
-	for _, v := range *lf {
-		s += " "
-		s += v
-	}
-	return s
-}
-
 func main() {
-	var host, user, pass, key string
-	var port int
-	var method, encryptKey string
-	var notRunCmd bool
-	var debug bool
-	var disableObfsAfterHandshake bool
-	var keepAliveInterval, keepAliveMax int
-
-	var localForwards stringSlice
-	var remoteForwards stringSlice
-	var dynamicForwards stringSlice
-
 	var configfile string
+	var cfg config
 
 	flag.StringVar(&configfile, "f", "", "configure file")
-	flag.StringVar(&user, "l", os.Getenv("USER"), "ssh username")
-	flag.StringVar(&pass, "pw", "", "ssh password")
-	flag.IntVar(&port, "p", 22, "remote port")
-	flag.StringVar(&key, "i", "", "private key file")
-	flag.Var(&localForwards, "L", "forward local port to remote, format [local_host:]local_port:remote_host:remote_port")
-	flag.Var(&remoteForwards, "R", "forward remote port to local, format [remote_host:]remote_port:local_host:local_port")
-	flag.BoolVar(&notRunCmd, "N", false, "not run remote command, useful when do port forward")
-	flag.Var(&dynamicForwards, "D", "enable dynamic forward, format [local_host:]local_port")
-	flag.StringVar(&method, "obfs_method", "", "transport encrypt method, avaliable: rc4, aes, empty means disable encrypt")
-	flag.StringVar(&encryptKey, "obfs_key", "", "transport encrypt key")
-	flag.BoolVar(&debug, "d", false, "verbose mode")
-	flag.IntVar(&keepAliveInterval, "keepalive_interval", 10, "keep alive interval")
-	flag.IntVar(&keepAliveMax, "keepalive_max", 5, "keep alive max")
-	flag.BoolVar(&disableObfsAfterHandshake, "disable_obfs_after_handshake", false, "disable obfs after handshake")
+	flag.StringVar(&cfg.Username, "l", os.Getenv("USER"), "ssh username")
+	flag.StringVar(&cfg.Password, "pw", "", "ssh password")
+	flag.IntVar(&cfg.Port, "p", 22, "remote port")
+	flag.StringVar(&cfg.PrivateKey, "i", "", "private key file")
+	flag.Var(&cfg.LocalForwards, "L", "forward local port to remote, format [local_host:]local_port:remote_host:remote_port")
+	flag.Var(&cfg.RemoteForwards, "R", "forward remote port to local, format [remote_host:]remote_port:local_host:local_port")
+	flag.BoolVar(&cfg.NotRunCmd, "N", false, "not run remote command, useful when do port forward")
+	flag.Var(&cfg.DynamicForwards, "D", "enable dynamic forward, format [local_host:]local_port")
+	flag.StringVar(&cfg.ObfsMethod, "obfs_method", "", "transport encrypt method, avaliable: rc4, aes, empty means disable encrypt")
+	flag.StringVar(&cfg.ObfsKey, "obfs_key", "", "transport encrypt key")
+	flag.BoolVar(&cfg.Debug, "d", false, "verbose mode")
+	flag.IntVar(&cfg.KeepaliveInterval, "keepalive_interval", 10, "keep alive interval")
+	flag.IntVar(&cfg.KeepaliveMax, "keepalive_max", 5, "keep alive max")
+	flag.BoolVar(&cfg.DisableObfsAfterHandshake, "disable_obfs_after_handshake", false, "disable obfs after handshake")
+	flag.Usage = usage
 	flag.Parse()
 
 	if configfile != "" {
-		if c, err := loadConfig(configfile); err == nil {
-			if c.Host != "" {
-				host = c.Host
-			}
-			if c.Username != "" {
-				user = c.Username
-			}
-			if c.Password != "" {
-				pass = c.Password
-			}
-			if c.Port != 0 {
-				port = c.Port
-			}
-			if c.PrivateKey != "" {
-				key = c.PrivateKey
-			}
-			if c.ObfsMethod != "" {
-				method = c.ObfsMethod
-			}
-			if c.ObfsKey != "" {
-				encryptKey = c.ObfsKey
-			}
-			if c.Debug {
-				debug = c.Debug
-			}
-			if c.DisableObfsAfterHandshake {
-				disableObfsAfterHandshake = c.DisableObfsAfterHandshake
-			}
-			if c.NotRunCmd {
-				notRunCmd = c.NotRunCmd
-			}
-			if c.KeepaliveInterval != 0 {
-				keepAliveInterval = c.KeepaliveInterval
-			}
-			if c.KeepaliveMax != 0 {
-				keepAliveMax = c.KeepaliveMax
-			}
-
-			if len(c.LocalForward) != 0 {
-				localForwards = append(localForwards, c.LocalForward...)
-			}
-			if len(c.RemoteForward) != 0 {
-				remoteForwards = append(remoteForwards, c.RemoteForward...)
-			}
-			if len(c.DynamicForward) != 0 {
-				dynamicForwards = append(dynamicForwards, c.DynamicForward...)
-			}
+		if err := loadConfig(&cfg, configfile); err == nil {
+			log.Fatal(err)
 		}
 	}
 
-	if debug {
+	if cfg.Debug {
 		obfssh.SSHLogLevel = obfssh.DEBUG
 	}
 
@@ -128,7 +54,7 @@ func main() {
 	var err error
 
 	// read ssh agent and default auth key
-	if pass == "" && key == "" {
+	if cfg.Password == "" && cfg.PrivateKey == "" {
 		var pkeys []ssh.Signer
 
 		// read default ssh private
@@ -176,6 +102,7 @@ func main() {
 
 	args := flag.Args()
 	var cmd string
+	host := cfg.Host
 	if host == "" {
 		switch len(args) {
 		case 0:
@@ -194,13 +121,13 @@ func main() {
 
 	if strings.Contains(host, "@") {
 		ss := strings.SplitN(host, "@", 2)
-		user = ss[0]
+		cfg.Username = ss[0]
 		host = ss[1]
 	}
 
 	// process user specified private key
-	if key != "" {
-		pemBytes, err := ioutil.ReadFile(key)
+	if cfg.PrivateKey != "" {
+		pemBytes, err := ioutil.ReadFile(cfg.PrivateKey)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -208,13 +135,13 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		obfssh.Log(obfssh.DEBUG, "add private key %s", key)
+		obfssh.Log(obfssh.DEBUG, "add private key %s", cfg.PrivateKey)
 		auth = append(auth, ssh.PublicKeys(priKey))
 	}
 
-	if pass != "" {
+	if cfg.Password != "" {
 		obfssh.Log(obfssh.DEBUG, "add password auth method")
-		auth = append(auth, ssh.Password(pass))
+		auth = append(auth, ssh.Password(cfg.Password))
 	} else {
 		obfssh.Log(obfssh.DEBUG, "add keyboard interactive auth")
 		//auth = append(auth,
@@ -224,12 +151,12 @@ func main() {
 	}
 
 	config := &ssh.ClientConfig{
-		User:    user,
+		User:    cfg.Username,
 		Auth:    auth,
 		Timeout: 10 * time.Second,
 	}
 
-	rhost := net.JoinHostPort(host, fmt.Sprintf("%d", port))
+	rhost := net.JoinHostPort(host, fmt.Sprintf("%d", cfg.Port))
 
 	c, err := net.Dial("tcp", rhost)
 	if err != nil {
@@ -237,12 +164,12 @@ func main() {
 	}
 
 	conf := &obfssh.Conf{
-		ObfsMethod:                method,
-		ObfsKey:                   encryptKey,
-		Timeout:                   time.Duration(keepAliveInterval+5) * time.Second,
-		KeepAliveInterval:         time.Duration(keepAliveInterval) * time.Second,
-		KeepAliveMax:              keepAliveMax,
-		DisableObfsAfterHandshake: disableObfsAfterHandshake,
+		ObfsMethod:                cfg.ObfsMethod,
+		ObfsKey:                   cfg.ObfsKey,
+		Timeout:                   time.Duration(cfg.KeepaliveInterval+5) * time.Second,
+		KeepAliveInterval:         time.Duration(cfg.KeepaliveInterval) * time.Second,
+		KeepAliveMax:              cfg.KeepaliveMax,
+		DisableObfsAfterHandshake: cfg.DisableObfsAfterHandshake,
 	}
 
 	client, err := obfssh.NewClient(c, config, rhost, conf)
@@ -254,7 +181,7 @@ func main() {
 
 	// process port forward
 
-	for _, p := range localForwards {
+	for _, p := range cfg.LocalForwards {
 		addr := parseForwardAddr(p)
 		if len(addr) != 4 && len(addr) != 3 {
 			log.Printf("wrong forward addr %s, format: [local_host:]local_port:remote_host:remote_port", p)
@@ -273,7 +200,7 @@ func main() {
 		}
 	}
 
-	for _, p := range remoteForwards {
+	for _, p := range cfg.RemoteForwards {
 		addr := parseForwardAddr(p)
 		if len(addr) != 4 && len(addr) != 3 {
 			log.Printf("wrong forward addr %s, format: [local_host:]local_port:remote_host:remote_port", p)
@@ -291,7 +218,7 @@ func main() {
 			log.Println(err)
 		}
 	}
-	for _, p := range dynamicForwards {
+	for _, p := range cfg.DynamicForwards {
 
 		if strings.Index(p, ":") == -1 {
 			local = fmt.Sprintf(":%s", p)
@@ -304,7 +231,7 @@ func main() {
 		}
 	}
 
-	if !notRunCmd {
+	if !cfg.NotRunCmd {
 		if cmd != "" {
 			if d, err := client.RunCmd(cmd); err != nil {
 				log.Println(err)
@@ -352,4 +279,60 @@ func passwordAuth() (string, error) {
 	// read password from console
 	s, err := speakeasy.Ask("Password: ")
 	return strings.Trim(s, " \r\n"), err
+}
+
+func usage() {
+	usageStr := `Usage:
+  obfss_client -N -d -D [bind_address:]port -f configfile
+   -i identity_file -L [bind_address:]port:host:hostport -l login_name
+   -pw password -p port 
+   -R [bind_address:]port:host:hostport [user@]hostname [command]
+
+Options:
+
+	-d  verbose mode
+
+	-D [bind_adress:]port
+	   Specifies a local dynamic application-level port
+	   forwarding. This listen a port on the local side
+	   and act as socks server, when a connection is made
+	   to this port, the connection is forwarded over 
+	   the secure channel, the distination is determined
+	   by socks protocol.
+	   This option can be specified multiple times.
+
+	-f configfile
+	   Specifies a config file to load arguments.
+	   The config file is YAML format,
+	   see config_example.yaml for details.
+
+	-i identity_file
+	   Specifies a identity(private key) for public key authentication.
+
+	-L [bind_address:]port:host:hostport
+	   Listen a port on local side, when a connection is made to
+	   this port, the connection is forwared over the secure 
+	   channel to host:portport from the remote machine.
+	   This option can be specified multiple times.
+
+	-l login_name
+	   specifies the user to log in as on the remote machine.
+	
+	-N  Do not execute commannd or start shell on remote machine.
+	    This is useful for just port forwarding.
+
+	-p port
+	   Port to connect to on the remote host
+	
+	-pw password
+	   Specifies the password for log in remote machine
+
+	-R [bind_address:]port:host:hostport
+	   Listen a port on remote machine, when a connection is 
+	   made to that port, the connection is forwarded over
+	   the secure channel to host:hostport from the local machine.
+	   This option can be specified multiple times.
+`
+	fmt.Printf("%s", usageStr)
+	os.Exit(1)
 }
