@@ -106,8 +106,8 @@ func main() {
 	if host == "" {
 		switch len(args) {
 		case 0:
-			flag.PrintDefaults()
-			log.Fatal("you must specify the remote host")
+			fmt.Println("you must specify the remote host")
+			usage()
 		case 1:
 			host = args[0]
 			cmd = ""
@@ -284,54 +284,80 @@ func passwordAuth() (string, error) {
 func usage() {
 	usageStr := `Usage:
   obfss_client -N -d -D [bind_address:]port -f configfile
-   -i identity_file -L [bind_address:]port:host:hostport -l login_name
-   -pw password -p port 
+   -i identity_file -L [bind_address:]port:host:hostport
+   -l login_name -pw password -p port -obfs_method method
+   -obfs_key key -disable_obfs_after_handshake 
    -R [bind_address:]port:host:hostport [user@]hostname [command]
 
 Options:
+    -d verbose mode
 
-	-d  verbose mode
+    -D [bind_adress:]port
+      Specifies a local dynamic application-level port
+      forwarding. This listen a port on the local side
+      and act as socks server, when a connection is made
+      to this port, the connection is forwarded over 
+      the secure channel, the distination is determined
+      by socks protocol.
+      This option can be specified multiple times.
 
-	-D [bind_adress:]port
-	   Specifies a local dynamic application-level port
-	   forwarding. This listen a port on the local side
-	   and act as socks server, when a connection is made
-	   to this port, the connection is forwarded over 
-	   the secure channel, the distination is determined
-	   by socks protocol.
-	   This option can be specified multiple times.
+    -f configfile
+      Specifies a config file to load arguments.
+      The config file is YAML format,
+      see config_example.yaml for details.
 
-	-f configfile
-	   Specifies a config file to load arguments.
-	   The config file is YAML format,
-	   see config_example.yaml for details.
+    -i identity_file
+      Specifies a identity(private key) for public key authentication.
 
-	-i identity_file
-	   Specifies a identity(private key) for public key authentication.
+    -L [bind_address:]port:host:hostport
+      Listen a port on local side, when a connection is made to
+      this port, the connection is forwared over the secure 
+      channel to host:portport from the remote machine.
+      This option can be specified multiple times.
 
-	-L [bind_address:]port:host:hostport
-	   Listen a port on local side, when a connection is made to
-	   this port, the connection is forwared over the secure 
-	   channel to host:portport from the remote machine.
-	   This option can be specified multiple times.
+    -l login_name
+      specifies the user to log in as on the remote machine.
+    
+    -N  Do not execute commannd or start shell on remote machine.
+      This is useful for just port forwarding.
 
-	-l login_name
-	   specifies the user to log in as on the remote machine.
-	
-	-N  Do not execute commannd or start shell on remote machine.
-	    This is useful for just port forwarding.
+    -p port
+      Port to connect to on the remote host
+    
+    -pw password
+      Specifies the password for log in remote machine
 
-	-p port
-	   Port to connect to on the remote host
-	
-	-pw password
-	   Specifies the password for log in remote machine
+    -R [bind_address:]port:host:hostport
+      Listen a port on remote machine, when a connection is 
+      made to that port, the connection is forwarded over
+      the secure channel to host:hostport from the local machine.
+      This option can be specified multiple times.
 
-	-R [bind_address:]port:host:hostport
-	   Listen a port on remote machine, when a connection is 
-	   made to that port, the connection is forwarded over
-	   the secure channel to host:hostport from the local machine.
-	   This option can be specified multiple times.
+    -keepalive_interval interval
+      Specifies the interval of keep alive message,
+      the interval is integer in seconds.
+
+    -keepalive_max max
+      Specifies the max error count for keep alive,
+      when the count reach the max, the connection will
+      be abort.
+
+Options for obfuscation:
+    -obfs_method method
+      Specifies the encryption method.
+      when this option is specified, the entire connection 
+      will be encrypted.
+      when set to none, the encryption is disabled.
+      Avaliable methods: rc4, aes, none(default)
+
+    -obfs_key key
+      Specifies the key to encrypt the connection,
+      if the server enable the obfs, only known the
+      right key can connect to the server.
+
+    -disable_obfs_after_handshake
+      when this option is specified, only encrypt the
+      ssh handshake message.
 `
 	fmt.Printf("%s", usageStr)
 	os.Exit(1)

@@ -28,13 +28,8 @@ func main() {
 	var debug bool
 	var hasError bool
 
-	flag.Usage = func() {
-		fmt.Printf("Usage: \n\t%s [options] user@host:path local\n\tor\n\t%s [options] local... user@host:path\n", os.Args[0], os.Args[0])
+	flag.Usage = usage
 
-		fmt.Printf("Options:\n\n")
-
-		flag.PrintDefaults()
-	}
 	flag.BoolVar(&debug, "d", false, "verbose mode")
 	flag.StringVar(&port, "p", "22", "port")
 	flag.StringVar(&user, "l", os.Getenv("USER"), "user")
@@ -53,7 +48,6 @@ func main() {
 	args := flag.Args()
 
 	if len(args) < 2 {
-		//fmt.Printf("Usage: \n\tscp user@host:path local\n\tor\n\tscp local... user@host:path\n")
 		flag.Usage()
 		os.Exit(1)
 	}
@@ -505,4 +499,48 @@ func copyFile(w io.Writer, r io.Reader) error {
 			return err
 		}
 	}
+}
+
+func usage() {
+	usageStr := `Usage:
+  obfssh_scp -i identity_file -l login_name 
+    -p port -pw password -r -obfs_method method -obfs_key key 
+    -disable_obfs_after_handshake [user@]host1:]file1 ... [user@host2:]file2
+
+Options:
+    -d  verbose mode
+
+    -i identity_file
+      Specifies a identity(private key) for public key authentication.
+
+    -l login_name
+      specifies the user to log in as on the remote machine.
+
+    -p port
+      Port to connect to on the remote host
+    
+    -pw password
+      Specifies the password for log in remote machine
+
+    -r recursively copy the directories
+     
+Options for obfuscation:
+    -obfs_method method
+      Specifies the encryption method.
+      when this option is specified, the entire connection 
+      will be encrypted.
+      when set to none, the encryption is disabled.
+      Avaliable methods: rc4, aes, none(default)
+
+    -obfs_key key
+      Specifies the key to encrypt the connection,
+      if the server enable the obfs, only known the
+      right key can connect to the server.
+
+    -disable_obfs_after_handshake
+      when this option is specified, only encrypt the
+      ssh handshake message.
+`
+	fmt.Printf("%s", usageStr)
+	os.Exit(1)
 }
