@@ -259,6 +259,8 @@ func download(args []string, cfg *options) error {
 			lfile = filepath.Join(lfile, filepath.Base(path))
 		}
 
+		lfile = clean(lfile)
+
 		if err := get(sftpConn, path, lfile); err != nil {
 			debuglog("download error: %s", err)
 			err1 = err
@@ -344,6 +346,8 @@ func upload(args []string, cfg *options) error {
 		if st != nil && st.Mode().IsDir() {
 			remoteFile = filepath.Join(path, filepath.Base(localFile))
 		}
+
+		remoteFile = clean(remoteFile)
 
 		if err := put(sftpConn, localFile, remoteFile); err != nil {
 			debuglog("upload %s failed: %s", localFile, err.Error())
