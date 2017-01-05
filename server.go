@@ -244,7 +244,7 @@ func (sc *Server) handleCancelTcpipForward(req *ssh.Request) {
 func (sc *Server) handleTcpipForward(req *ssh.Request) {
 	var addr tcpipForwardAddr
 	if err := ssh.Unmarshal(req.Payload, &addr); err != nil {
-		Log(ERROR, "parse ssh data error: %s", err.Error)
+		Log(ERROR, "parse ssh data error: %s", err)
 		if req.WantReply {
 			req.Reply(false, nil)
 		}

@@ -70,7 +70,6 @@ func NewObfsConn(c net.Conn, method, key string, isServer bool) (*ObfsConn, erro
 					return nil, err
 				}
 			}
-			return nil, err
 		}
 	} else {
 		if err := wc.writeSeed(); err != nil {
