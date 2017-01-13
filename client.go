@@ -255,8 +255,35 @@ func (cc *Client) handleRemoteForward(conn net.Conn, local string) {
 }
 
 func (cc *Client) handleDynamicForward(conn net.Conn) {
+	addr, err := getOriginDst(conn)
+	if err == nil {
+		if addr.String() != conn.LocalAddr().String() {
+			// transparent proxy
+			// iptables redirect the packet to this port
+			cc.handleTransparentProxy(conn, addr)
+			return
+		}
+	} else {
+		// SO_ORIGNAL_DST failed
+		// ipv6 not support this syscall
+		// so ignore it
+		Log(DEBUG, "get original destination on %s failed: %s, ignore",
+			conn.LocalAddr(), err)
+	}
+
+	// socks5 to this port
 	s := socks.Conn{Conn: conn, Dial: cc.client.Dial}
 	s.Serve()
+}
+
+func (cc *Client) handleTransparentProxy(c net.Conn, addr net.Addr) {
+	c2, err := cc.client.Dial("tcp", addr.String())
+	if err != nil {
+		Log(ERROR, "%s", err)
+		c.Close()
+		return
+	}
+	PipeAndClose(c2, c)
 }
 
 func (cc *Client) keepAlive(interval time.Duration, maxCount int) {
