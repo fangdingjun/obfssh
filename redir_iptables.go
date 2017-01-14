@@ -31,6 +31,15 @@ func getOriginDst(c net.Conn) (net.Addr, error) {
 
 	defer f.Close()
 
+	// ipv4
+	level := syscall.SOL_IP
+
+	remoteIP := c.RemoteAddr().(*net.TCPAddr).IP
+	if remoteIP.To4() == nil {
+		// ipv6
+		level = syscall.SOL_IPV6
+	}
+
 	// get original ip destination, in C like this
 	//
 	// struct sockaddr addr;
@@ -39,7 +48,7 @@ func getOriginDst(c net.Conn) (net.Addr, error) {
 	// getsocketopt(fd, SOL_IP, SO_ORIGINAL_DST, &addr, &len);
 	//
 	_, _, errno := syscall.Syscall6(sysGetSockOpt, f.Fd(),
-		uintptr(syscall.SOL_IP), uintptr(soOriginalDst),
+		uintptr(level), uintptr(soOriginalDst),
 		uintptr(unsafe.Pointer(&sockaddr)),
 		uintptr(unsafe.Pointer(&len)), 0)
 
@@ -54,11 +63,11 @@ func getOriginDst(c net.Conn) (net.Addr, error) {
 	case syscall.AF_INET:
 		a := (*syscall.RawSockaddrInet4)(unsafe.Pointer(&sockaddr))
 		ip = net.IP(a.Addr[0:])
-		port = ntohl(a.Port)
+		port = ntohs(a.Port)
 	case syscall.AF_INET6:
 		a := (*syscall.RawSockaddrInet6)(unsafe.Pointer(&sockaddr))
 		ip = net.IP(a.Addr[0:])
-		port = ntohl(a.Port)
+		port = ntohs(a.Port)
 	default:
 		return nil, fmt.Errorf("unknown socket family: %d",
 			sockaddr.Addr.Family)
@@ -68,9 +77,31 @@ func getOriginDst(c net.Conn) (net.Addr, error) {
 	return addr, nil
 }
 
-func ntohl(a uint16) uint16 {
-	b := make([]byte, 2)
-	binary.BigEndian.PutUint16(b, a)
-	c := binary.LittleEndian.Uint16(b)
-	return c
+func ntohs(a uint16) uint16 {
+	if isLittleEndian {
+		b := make([]byte, 2)
+		binary.BigEndian.PutUint16(b, a)
+		c := binary.LittleEndian.Uint16(b)
+		return c
+	}
+	return a
+}
+
+var isLittleEndian = isHostLittleEndian()
+
+func isHostLittleEndian() bool {
+	// determine the byte order
+
+	var num uint16 = 0x1234
+
+	buf := make([]byte, 2)
+
+	binary.BigEndian.PutUint16(buf, num)
+	p := (*[2]byte)(unsafe.Pointer(&num))
+	if p[0] != buf[0] {
+		// little endian
+		return true
+	}
+	// big endian
+	return false
 }

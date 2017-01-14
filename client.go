@@ -265,8 +265,7 @@ func (cc *Client) handleDynamicForward(conn net.Conn) {
 		}
 	} else {
 		// SO_ORIGNAL_DST failed
-		// ipv6 not support this syscall
-		// so ignore it
+		// just ignore it
 		Log(DEBUG, "get original destination on %s failed: %s, ignore",
 			conn.LocalAddr(), err)
 	}
