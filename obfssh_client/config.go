@@ -59,6 +59,15 @@ type config struct {
 	LocalForwards             stringSlice `yaml:"local_forward"`
 	RemoteForwards            stringSlice `yaml:"remote_forward"`
 	DynamicForwards           stringSlice `yaml:"dynamic_forward"`
+	Proxy                     proxy
+}
+
+type proxy struct {
+	Scheme   string
+	Host     string
+	Port     int
+	SNI      string
+	Insecure bool
 }
 
 // loadConfig load config from config file

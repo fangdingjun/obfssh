@@ -156,9 +156,27 @@ func main() {
 		Timeout: 10 * time.Second,
 	}
 
+	// parse environment proxy
+	updateProxyFromEnv(&cfg)
+
 	rhost := net.JoinHostPort(host, fmt.Sprintf("%d", cfg.Port))
 
-	c, err := net.Dial("tcp", rhost)
+	var c net.Conn
+	if cfg.Proxy.Scheme != "" && cfg.Proxy.Host != "" && cfg.Proxy.Port != 0 {
+		switch cfg.Proxy.Scheme {
+		case "http":
+			c, err = dialHTTPProxy(host, cfg.Port, cfg.Proxy)
+		case "https":
+			c, err = dialHTTPSProxy(host, cfg.Port, cfg.Proxy)
+		case "socks5":
+			c, err = dialSocks5Proxy(host, cfg.Port, cfg.Proxy)
+		default:
+			err = fmt.Errorf("unsupported scheme: %s", cfg.Proxy.Scheme)
+		}
+	} else {
+		c, err = net.Dial("tcp", rhost)
+	}
+
 	if err != nil {
 		log.Fatal(err)
 	}

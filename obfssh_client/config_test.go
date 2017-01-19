@@ -6,7 +6,8 @@ import (
 )
 
 func TestConfig(t *testing.T) {
-	c, err := loadConfig("config_example.yaml")
+	var c config
+	err := loadConfig(&c, "config_example.yaml")
 	if err != nil {
 		t.Error(err)
 	}
