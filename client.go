@@ -260,6 +260,7 @@ func (cc *Client) handleDynamicForward(conn net.Conn) {
 		if addr.String() != conn.LocalAddr().String() {
 			// transparent proxy
 			// iptables redirect the packet to this port
+			Log(DEBUG, "transparent %s -> %s", conn.RemoteAddr(), addr)
 			cc.handleTransparentProxy(conn, addr)
 			return
 		}
@@ -271,6 +272,7 @@ func (cc *Client) handleDynamicForward(conn net.Conn) {
 	}
 
 	// socks5 to this port
+	Log(DEBUG, "socks %s", conn.RemoteAddr())
 	s := socks.Conn{Conn: conn, Dial: cc.client.Dial}
 	s.Serve()
 }
