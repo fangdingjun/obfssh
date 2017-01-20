@@ -7,6 +7,7 @@ import (
 	"github.com/fangdingjun/obfssh"
 	socks "github.com/fangdingjun/socks-go"
 	"net"
+	"net/textproto"
 	"net/url"
 	"os"
 	"strconv"
@@ -54,8 +55,9 @@ func httpProxyHandshake(c net.Conn, host string, port int) error {
 
 	r := bufio.NewReader(c)
 
+	tp := textproto.NewReader(r)
 	// read status line
-	statusLine, err := r.ReadString('\n')
+	statusLine, err := tp.ReadLine()
 	if err != nil {
 		return err
 	}
@@ -66,7 +68,7 @@ func httpProxyHandshake(c net.Conn, host string, port int) error {
 
 	status := strings.Fields(statusLine)[1]
 
-	statusCode, err := strconv.ParseInt(status, 10, 32)
+	statusCode, err := strconv.Atoi(status)
 	if err != nil {
 		return err
 	}
@@ -76,15 +78,8 @@ func httpProxyHandshake(c net.Conn, host string, port int) error {
 	}
 
 	// read header
-	for {
-		h, err := r.ReadString('\n')
-		if err != nil {
-			return err
-		}
-		h1 := strings.Trim(h, " \r\n")
-		if h1 == "" {
-			break
-		}
+	if _, err = tp.ReadMIMEHeader(); err != nil {
+		return err
 	}
 
 	return nil
