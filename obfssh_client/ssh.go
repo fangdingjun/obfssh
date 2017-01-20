@@ -165,10 +165,16 @@ func main() {
 	if cfg.Proxy.Scheme != "" && cfg.Proxy.Host != "" && cfg.Proxy.Port != 0 {
 		switch cfg.Proxy.Scheme {
 		case "http":
+			obfssh.Log(obfssh.DEBUG, "use http proxy %s:%d to connect to server",
+				cfg.Proxy.Host, cfg.Proxy.Port)
 			c, err = dialHTTPProxy(host, cfg.Port, cfg.Proxy)
 		case "https":
+			obfssh.Log(obfssh.DEBUG, "use https proxy %s:%d to connect to server",
+				cfg.Proxy.Host, cfg.Proxy.Port)
 			c, err = dialHTTPSProxy(host, cfg.Port, cfg.Proxy)
 		case "socks5":
+			obfssh.Log(obfssh.DEBUG, "use socks proxy %s:%d to connect to server",
+				cfg.Proxy.Host, cfg.Proxy.Port)
 			c, err = dialSocks5Proxy(host, cfg.Port, cfg.Proxy)
 		default:
 			err = fmt.Errorf("unsupported scheme: %s", cfg.Proxy.Scheme)
