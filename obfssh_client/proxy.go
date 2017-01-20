@@ -106,7 +106,7 @@ func httpProxyHandshake(c net.Conn, host string, port int) error {
 }
 
 func dialHTTPProxy(host string, port int, p proxy) (net.Conn, error) {
-	c, err := net.Dial("tcp", fmt.Sprintf("%s:%d", p.Host, p.Port))
+	c, err := net.Dial("tcp", net.JoinHostPort(p.Host, fmt.Sprintf("%d", p.Port)))
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +129,7 @@ func dialHTTPSProxy(host string, port int, p proxy) (net.Conn, error) {
 		InsecureSkipVerify: p.Insecure,
 	}
 
-	c, err := tls.Dial("tcp", fmt.Sprintf("%s:%d", p.Host, p.Port), tlsconfig)
+	c, err := tls.Dial("tcp", net.JoinHostPort(p.Host, fmt.Sprintf("%d", p.Port)), tlsconfig)
 	if err != nil {
 		return nil, err
 	}
@@ -147,13 +147,13 @@ func dialHTTPSProxy(host string, port int, p proxy) (net.Conn, error) {
 }
 
 func dialSocks5Proxy(host string, port int, p proxy) (net.Conn, error) {
-	c, err := net.Dial("tcp", fmt.Sprintf("%s:%d", p.Host, p.Port))
+	c, err := net.Dial("tcp", net.JoinHostPort(p.Host, fmt.Sprintf("%d", p.Port)))
 	if err != nil {
 		return nil, err
 	}
 
 	c1 := &socks.Client{Conn: c}
-	c2, err := c1.Dial("tcp", fmt.Sprintf("%s:%d", host, port))
+	c2, err := c1.Dial("tcp", net.JoinHostPort(host, fmt.Sprintf("%d", port)))
 	if err != nil {
 		c1.Close()
 		return nil, err
