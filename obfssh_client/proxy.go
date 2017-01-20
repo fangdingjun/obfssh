@@ -19,28 +19,48 @@ func updateProxyFromEnv(cfg *config) {
 		obfssh.Log(obfssh.DEBUG, "proxy already specified by config, not parse environment proxy")
 		return
 	}
-	proxyStr := os.Getenv("http_proxy")
+
+	proxyStr := os.Getenv("https_proxy")
 	if proxyStr == "" {
-		proxyStr = os.Getenv("https_proxy")
+		proxyStr = os.Getenv("HTTPS_PROXY")
 	}
+
+	if proxyStr == "" {
+		proxyStr = os.Getenv("http_proxy")
+	}
+
+	if proxyStr == "" {
+		proxyStr = os.Getenv("HTTP_PROXY")
+	}
+
 	if proxyStr == "" {
 		return
 	}
+
 	u, err := url.Parse(proxyStr)
 	if err != nil {
 		obfssh.Log(obfssh.DEBUG, "parse proxy from environment failed: %s", err)
 		return
 	}
+
 	cfg.Proxy.Scheme = u.Scheme
+
 	host, port, err := net.SplitHostPort(u.Host)
 	if err != nil {
-		cfg.Proxy.Host = host
-		cfg.Proxy.Port = 8080
+		// failed, maybe no port specified
+		cfg.Proxy.Host = u.Host
 	} else {
 		cfg.Proxy.Host = host
-		p, err := strconv.ParseInt(port, 10, 32)
+		p, err := strconv.Atoi(port)
 		if err == nil {
 			cfg.Proxy.Port = int(p)
+		}
+	}
+
+	// no port, set default port
+	if cfg.Proxy.Port == 0 {
+		if cfg.Proxy.Scheme == "https" {
+			cfg.Proxy.Port = 443
 		} else {
 			cfg.Proxy.Port = 8080
 		}
@@ -54,8 +74,8 @@ func httpProxyHandshake(c net.Conn, host string, port int) error {
 	fmt.Fprintf(c, "\r\n")
 
 	r := bufio.NewReader(c)
-
 	tp := textproto.NewReader(r)
+
 	// read status line
 	statusLine, err := tp.ReadLine()
 	if err != nil {
@@ -87,6 +107,10 @@ func httpProxyHandshake(c net.Conn, host string, port int) error {
 
 func dialHTTPProxy(host string, port int, p proxy) (net.Conn, error) {
 	c, err := net.Dial("tcp", fmt.Sprintf("%s:%d", p.Host, p.Port))
+	if err != nil {
+		return nil, err
+	}
+
 	if err = httpProxyHandshake(c, host, port); err != nil {
 		c.Close()
 		return nil, err
@@ -99,12 +123,17 @@ func dialHTTPSProxy(host string, port int, p proxy) (net.Conn, error) {
 	if p.SNI != "" {
 		hostname = p.SNI
 	}
+
 	tlsconfig := &tls.Config{
 		ServerName:         hostname,
 		InsecureSkipVerify: p.Insecure,
 	}
 
 	c, err := tls.Dial("tcp", fmt.Sprintf("%s:%d", p.Host, p.Port), tlsconfig)
+	if err != nil {
+		return nil, err
+	}
+
 	if err := c.Handshake(); err != nil {
 		c.Close()
 		return nil, err
@@ -120,7 +149,6 @@ func dialHTTPSProxy(host string, port int, p proxy) (net.Conn, error) {
 func dialSocks5Proxy(host string, port int, p proxy) (net.Conn, error) {
 	c, err := net.Dial("tcp", fmt.Sprintf("%s:%d", p.Host, p.Port))
 	if err != nil {
-		c.Close()
 		return nil, err
 	}
 
