@@ -153,9 +153,10 @@ func dialSocks5Proxy(host string, port int, p proxy) (net.Conn, error) {
 	}
 
 	c1 := &socks.Client{Conn: c}
-	if err = c1.Connect(host, uint16(port)); err != nil {
+	c2, err := c1.Dial("tcp", fmt.Sprintf("%s:%d", host, port))
+	if err != nil {
 		c1.Close()
 		return nil, err
 	}
-	return c1, err
+	return c2, err
 }
