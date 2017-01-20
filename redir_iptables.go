@@ -16,8 +16,6 @@ const (
 )
 
 func getOriginDst(c net.Conn) (net.Addr, error) {
-	var sockaddr syscall.RawSockaddrAny
-	var len = unsafe.Sizeof(sockaddr)
 
 	cc, ok := c.(*net.TCPConn)
 	if !ok {
@@ -31,13 +29,11 @@ func getOriginDst(c net.Conn) (net.Addr, error) {
 
 	defer f.Close()
 
-	// ipv4
-	level := syscall.SOL_IP
-
 	remoteIP := c.RemoteAddr().(*net.TCPAddr).IP
 	if remoteIP.To4() == nil {
 		// ipv6
-		level = syscall.SOL_IPV6
+		// not supported, just return local socket address
+		return c.LocalAddr(), nil
 	}
 
 	// get original ip destination, in C like this
@@ -47,31 +43,21 @@ func getOriginDst(c net.Conn) (net.Addr, error) {
 	// int len = sizeof(addr);
 	// getsocketopt(fd, SOL_IP, SO_ORIGINAL_DST, &addr, &len);
 	//
-	_, _, errno := syscall.Syscall6(sysGetSockOpt, f.Fd(),
-		uintptr(level), uintptr(soOriginalDst),
-		uintptr(unsafe.Pointer(&sockaddr)),
-		uintptr(unsafe.Pointer(&len)), 0)
+	//_, _, errno := syscall.Syscall6(sysGetSockOpt, f.Fd(),
+	//	uintptr(level), uintptr(soOriginalDst),
+	//	uintptr(unsafe.Pointer(&sockaddr)),
+	//	uintptr(unsafe.Pointer(&len)), 0)
+	maddr, err := syscall.GetsockoptIPv6Mreq(int(f.Fd()), syscall.SOL_IP, soOriginalDst)
 
-	if errno != 0 {
-		return nil, fmt.Errorf("syscall error %d", errno)
+	if err != nil {
+		return nil, err
 	}
 
 	var port uint16
 	var ip net.IP
-
-	switch sockaddr.Addr.Family {
-	case syscall.AF_INET:
-		a := (*syscall.RawSockaddrInet4)(unsafe.Pointer(&sockaddr))
-		ip = net.IP(a.Addr[0:])
-		port = ntohs(a.Port)
-	case syscall.AF_INET6:
-		a := (*syscall.RawSockaddrInet6)(unsafe.Pointer(&sockaddr))
-		ip = net.IP(a.Addr[0:])
-		port = ntohs(a.Port)
-	default:
-		return nil, fmt.Errorf("unknown socket family: %d",
-			sockaddr.Addr.Family)
-	}
+	rawaddr := (*syscall.RawSockaddrInet4)(unsafe.Pointer(&maddr.Multiaddr))
+	ip = net.IP(rawaddr.Addr[0:])
+	port = ntohs(rawaddr.Port)
 
 	addr := &net.TCPAddr{IP: ip, Port: int(port)}
 	return addr, nil
