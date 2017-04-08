@@ -83,7 +83,7 @@ func httpProxyHandshake(c net.Conn, host string, port int) error {
 	}
 
 	if statusLine[0:4] != "HTTP" {
-		return err
+		return fmt.Errorf("not http reply")
 	}
 
 	status := strings.Fields(statusLine)[1]
