@@ -22,16 +22,16 @@ var SSHLogLevel = ERROR
 func PipeAndClose(c io.ReadWriteCloser, s io.ReadWriteCloser) {
 	defer c.Close()
 	defer s.Close()
-	cc := make(chan int, 2)
+	cc := make(chan struct{}, 2)
 
 	go func() {
 		io.Copy(c, s)
-		cc <- 1
+		cc <- struct{}{}
 	}()
 
 	go func() {
 		io.Copy(s, c)
-		cc <- 1
+		cc <- struct{}{}
 	}()
 
 	<-cc

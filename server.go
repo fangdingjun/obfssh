@@ -12,7 +12,7 @@ type Server struct {
 	conn           net.Conn
 	sshConn        *ssh.ServerConn
 	forwardedPorts map[string]net.Listener
-	exitCh         chan int
+	exitCh         chan struct{}
 }
 
 // NewServer create a new struct for Server
@@ -47,7 +47,7 @@ func NewServer(c net.Conn, config *ssh.ServerConfig, conf *Conf) (*Server, error
 	sc := &Server{conn: c,
 		sshConn:        sshConn,
 		forwardedPorts: map[string]net.Listener{},
-		exitCh:         make(chan int)}
+		exitCh:         make(chan struct{})}
 	go sc.handleGlobalRequest(req)
 	go sc.handleNewChannelRequest(ch)
 	return sc, nil

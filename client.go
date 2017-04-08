@@ -17,7 +17,7 @@ type Client struct {
 	sshConn   ssh.Conn
 	client    *ssh.Client
 	listeners []net.Listener
-	ch        chan int
+	ch        chan struct{}
 }
 
 // NewClient create a new ssh Client
@@ -51,7 +51,7 @@ func NewClient(c net.Conn, config *ssh.ClientConfig, addr string, conf *Conf) (*
 	sshClient := ssh.NewClient(sshConn, newch, reqs)
 	client := &Client{
 		conn: c, sshConn: sshConn, client: sshClient,
-		ch: make(chan int),
+		ch: make(chan struct{}),
 	}
 	go client.keepAlive(conf.KeepAliveInterval, conf.KeepAliveMax)
 	return client, nil
@@ -74,7 +74,7 @@ func (cc *Client) Run() {
 		go func() {
 			cc.sshConn.Wait()
 			select {
-			case cc.ch <- 1:
+			case cc.ch <- struct{}{}:
 			default:
 			}
 		}()
@@ -305,7 +305,7 @@ func (cc *Client) keepAlive(interval time.Duration, maxCount int) {
 				cc.sshConn.Close()
 				// send exit signal
 				select {
-				case cc.ch <- 1:
+				case cc.ch <- struct{}{}:
 				default:
 				}
 				return
@@ -321,7 +321,7 @@ func (cc *Client) registerSignal() {
 	case s1 := <-c:
 		Log(ERROR, "signal %d received, exit", s1)
 		select {
-		case cc.ch <- 1:
+		case cc.ch <- struct{}{}:
 		default:
 		}
 	}
