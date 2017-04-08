@@ -260,21 +260,33 @@ func main() {
 		}
 	}
 
+	hasErr := false
+
 	if !cfg.NotRunCmd {
 		if cmd != "" {
 			if d, err := client.RunCmd(cmd); err != nil {
 				log.Println(err)
+				hasErr = true
 			} else {
 				//log.Printf("%s", string(d))
 				fmt.Printf("%s", string(d))
 			}
 		} else {
 			if err := client.Shell(); err != nil {
+				hasErr = true
 				log.Println(err)
 			}
 		}
 	}
-	client.Run()
+
+	if err := client.Run(); err != nil {
+		log.Println(err)
+		hasErr = true
+	}
+
+	if hasErr {
+		os.Exit(1)
+	}
 }
 
 func parseForwardAddr(s string) []string {
