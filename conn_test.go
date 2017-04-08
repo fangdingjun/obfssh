@@ -88,7 +88,7 @@ func testTimedOutConn(t *testing.T, timeout bool) {
 	}
 
 	// timeout time
-	timeout_t := 1 * time.Second
+	timeout := 1 * time.Second
 
 	defer l.Close()
 
@@ -102,7 +102,7 @@ func testTimedOutConn(t *testing.T, timeout bool) {
 
 		defer s.Close()
 
-		sConn := TimedOutConn{s, timeout_t}
+		sConn := TimedOutConn{s, timeout}
 
 		buf := make([]byte, 100)
 
@@ -112,7 +112,7 @@ func testTimedOutConn(t *testing.T, timeout bool) {
 		}
 
 		if timeout {
-			time.Sleep(timeout_t + 1*time.Second)
+			time.Sleep(timeout + 1*time.Second)
 		}
 
 		sConn.Write(buf[:n])
@@ -127,7 +127,7 @@ func testTimedOutConn(t *testing.T, timeout bool) {
 
 	str := "hello, world"
 
-	cConn := TimedOutConn{c, timeout_t}
+	cConn := TimedOutConn{c, timeout}
 
 	if _, err := cConn.Write([]byte(str)); err != nil {
 		t.Fatalf("client write failed: %s", err)
