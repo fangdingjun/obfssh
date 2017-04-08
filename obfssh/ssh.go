@@ -154,6 +154,11 @@ func main() {
 		User:    cfg.Username,
 		Auth:    auth,
 		Timeout: 10 * time.Second,
+		HostKeyCallback: func(hostname string, remote net.Addr,
+			key ssh.PublicKey) error {
+			obfssh.Log(obfssh.INFO, "%s %s %+v", hostname, remote, key)
+			return nil
+		},
 	}
 
 	// parse environment proxy
