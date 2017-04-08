@@ -1,6 +1,7 @@
 package obfssh
 
 import (
+	"fmt"
 	socks "github.com/fangdingjun/socks-go"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/terminal"
@@ -18,6 +19,7 @@ type Client struct {
 	client    *ssh.Client
 	listeners []net.Listener
 	ch        chan struct{}
+	err       error
 }
 
 // NewClient create a new ssh Client
@@ -63,7 +65,7 @@ func (cc *Client) Client() *ssh.Client {
 }
 
 // Run wait ssh connection to finish
-func (cc *Client) Run() {
+func (cc *Client) Run() error {
 	select {
 	case <-time.After(1 * time.Second):
 	}
@@ -87,6 +89,7 @@ func (cc *Client) Run() {
 	}
 	Log(DEBUG, "Done")
 	cc.Close()
+	return cc.err
 }
 
 // Close close the ssh connection
@@ -301,6 +304,7 @@ func (cc *Client) keepAlive(interval time.Duration, maxCount int) {
 				count = 0
 			}
 			if count >= maxCount {
+				cc.err = fmt.Errorf("keep alive detects connection hang up")
 				Log(ERROR, "keep alive hit max count, exit")
 				cc.sshConn.Close()
 				// send exit signal
@@ -319,6 +323,7 @@ func (cc *Client) registerSignal() {
 	signal.Notify(c, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM)
 	select {
 	case s1 := <-c:
+		cc.err = fmt.Errorf("signal %v", s1)
 		Log(ERROR, "signal %d received, exit", s1)
 		select {
 		case cc.ch <- struct{}{}:
