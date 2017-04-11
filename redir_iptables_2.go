@@ -11,6 +11,11 @@ package obfssh
 #include <linux/netfilter_ipv4.h>
 #include <linux/netfilter_ipv6/ip6_tables.h>
 
+// the RPI toolchain does not have this macro
+#ifndef IP6T_SO_ORIGINAL_DST
+#define IP6T_SO_ORIGINAL_DST 80
+#endif
+
 int get_original_dst4(int fd, void *addr);
 int get_original_dst6(int fd, void *addr);
 
