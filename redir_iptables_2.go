@@ -5,9 +5,8 @@ package obfssh
 /*
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <linux/if.h>
-#include <netinet/ip.h>
-#include <netinet/ip6.h>
+#include <net/if.h>
+#include <netinet/in.h>
 #include <linux/netfilter_ipv4.h>
 #include <linux/netfilter_ipv6/ip6_tables.h>
 
