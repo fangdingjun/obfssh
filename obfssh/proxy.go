@@ -6,13 +6,54 @@ import (
 	"fmt"
 	"github.com/fangdingjun/obfssh"
 	socks "github.com/fangdingjun/socks-go"
+	"io"
 	"net"
 	"net/textproto"
 	"net/url"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
+
+type httpProxyConn struct {
+	c net.Conn
+	r io.Reader
+}
+
+func (hc *httpProxyConn) Read(b []byte) (int, error) {
+	return hc.r.Read(b)
+}
+
+func (hc *httpProxyConn) Write(b []byte) (int, error) {
+	return hc.c.Write(b)
+}
+
+func (hc *httpProxyConn) Close() error {
+	return hc.c.Close()
+}
+func (hc *httpProxyConn) LocalAddr() net.Addr {
+	return hc.c.LocalAddr()
+}
+
+func (hc *httpProxyConn) RemoteAddr() net.Addr {
+	return hc.c.RemoteAddr()
+}
+
+func (hc *httpProxyConn) SetDeadline(t time.Time) error {
+	return hc.c.SetDeadline(t)
+}
+
+func (hc *httpProxyConn) SetReadDeadline(t time.Time) error {
+	return hc.c.SetReadDeadline(t)
+}
+
+func (hc *httpProxyConn) SetWriteDeadline(t time.Time) error {
+	return hc.c.SetWriteDeadline(t)
+}
+
+// validate the interface implements
+var _ net.Conn = &httpProxyConn{}
 
 func updateProxyFromEnv(cfg *config) {
 	if cfg.Proxy.Scheme != "" && cfg.Proxy.Host != "" && cfg.Proxy.Port != 0 {
@@ -67,7 +108,7 @@ func updateProxyFromEnv(cfg *config) {
 	}
 }
 
-func httpProxyHandshake(c net.Conn, host string, port int) error {
+func httpProxyHandshake(c net.Conn, host string, port int) (net.Conn, error) {
 	fmt.Fprintf(c, "CONNECT %s:%d HTTP/1.1\r\n", host, port)
 	fmt.Fprintf(c, "Host: %s:%d\r\n", host, port)
 	fmt.Fprintf(c, "User-Agent: go/1.7\r\n")
@@ -79,30 +120,30 @@ func httpProxyHandshake(c net.Conn, host string, port int) error {
 	// read status line
 	statusLine, err := tp.ReadLine()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if statusLine[0:4] != "HTTP" {
-		return fmt.Errorf("not http reply")
+		return nil, fmt.Errorf("not http reply")
 	}
 
 	status := strings.Fields(statusLine)[1]
 
 	statusCode, err := strconv.Atoi(status)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if statusCode != 200 {
-		return fmt.Errorf("http status error %d", statusCode)
+		return nil, fmt.Errorf("http status error %d", statusCode)
 	}
 
 	// read header
 	if _, err = tp.ReadMIMEHeader(); err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return &httpProxyConn{c: c, r: r}, nil
 }
 
 func dialHTTPProxy(host string, port int, p proxy) (net.Conn, error) {
@@ -111,11 +152,12 @@ func dialHTTPProxy(host string, port int, p proxy) (net.Conn, error) {
 		return nil, err
 	}
 
-	if err = httpProxyHandshake(c, host, port); err != nil {
+	c1, err := httpProxyHandshake(c, host, port)
+	if err != nil {
 		c.Close()
 		return nil, err
 	}
-	return c, nil
+	return c1, nil
 }
 
 func dialHTTPSProxy(host string, port int, p proxy) (net.Conn, error) {
@@ -139,11 +181,12 @@ func dialHTTPSProxy(host string, port int, p proxy) (net.Conn, error) {
 		return nil, err
 	}
 
-	if err = httpProxyHandshake(c, host, port); err != nil {
+	c1, err := httpProxyHandshake(c, host, port)
+	if err != nil {
 		c.Close()
 		return nil, err
 	}
-	return c, nil
+	return c1, nil
 }
 
 func dialSocks5Proxy(host string, port int, p proxy) (net.Conn, error) {
