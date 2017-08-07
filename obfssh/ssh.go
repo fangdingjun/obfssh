@@ -195,7 +195,7 @@ func main() {
 	conf := &obfssh.Conf{
 		ObfsMethod:                cfg.ObfsMethod,
 		ObfsKey:                   cfg.ObfsKey,
-		Timeout:                   time.Duration(cfg.KeepaliveInterval+5) * time.Second,
+		Timeout:                   time.Duration(cfg.KeepaliveInterval*2) * time.Second,
 		KeepAliveInterval:         time.Duration(cfg.KeepaliveInterval) * time.Second,
 		KeepAliveMax:              cfg.KeepaliveMax,
 		DisableObfsAfterHandshake: cfg.DisableObfsAfterHandshake,
