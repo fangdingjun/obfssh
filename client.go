@@ -74,7 +74,8 @@ func (cc *Client) Run() error {
 		Log(DEBUG, "wait all channel to be done")
 		go cc.registerSignal()
 		go func() {
-			cc.sshConn.Wait()
+			cc.err = cc.sshConn.Wait()
+			Log(DEBUG, "connection hang up")
 			close(cc.ch)
 		}()
 
