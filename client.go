@@ -75,10 +75,7 @@ func (cc *Client) Run() error {
 		go cc.registerSignal()
 		go func() {
 			cc.sshConn.Wait()
-			select {
-			case cc.ch <- struct{}{}:
-			default:
-			}
+			close(cc.ch)
 		}()
 
 		// wait exit signal
@@ -308,10 +305,7 @@ func (cc *Client) keepAlive(interval time.Duration, maxCount int) {
 				Log(ERROR, "keep alive hit max count, exit")
 				cc.sshConn.Close()
 				// send exit signal
-				select {
-				case cc.ch <- struct{}{}:
-				default:
-				}
+				close(cc.ch)
 				return
 			}
 		}
@@ -325,9 +319,6 @@ func (cc *Client) registerSignal() {
 	case s1 := <-c:
 		cc.err = fmt.Errorf("signal %v", s1)
 		Log(ERROR, "signal %d received, exit", s1)
-		select {
-		case cc.ch <- struct{}{}:
-		default:
-		}
+		close(cc.ch)
 	}
 }
