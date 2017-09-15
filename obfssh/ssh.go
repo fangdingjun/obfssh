@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"github.com/bgentry/speakeasy"
@@ -25,16 +26,15 @@ func main() {
 	flag.StringVar(&cfg.Password, "pw", "", "ssh password")
 	flag.IntVar(&cfg.Port, "p", 22, "remote port")
 	flag.StringVar(&cfg.PrivateKey, "i", "", "private key file")
+	flag.BoolVar(&cfg.TLS, "tls", false, "use tls or not")
+	flag.BoolVar(&cfg.TLSInsecure, "tls-insecure", false, "insecure tls connnection")
 	flag.Var(&cfg.LocalForwards, "L", "forward local port to remote, format [local_host:]local_port:remote_host:remote_port")
 	flag.Var(&cfg.RemoteForwards, "R", "forward remote port to local, format [remote_host:]remote_port:local_host:local_port")
 	flag.BoolVar(&cfg.NotRunCmd, "N", false, "not run remote command, useful when do port forward")
 	flag.Var(&cfg.DynamicForwards, "D", "enable dynamic forward, format [local_host:]local_port")
-	flag.StringVar(&cfg.ObfsMethod, "obfs_method", "", "transport encrypt method, avaliable: rc4, aes, empty means disable encrypt")
-	flag.StringVar(&cfg.ObfsKey, "obfs_key", "", "transport encrypt key")
 	flag.BoolVar(&cfg.Debug, "d", false, "verbose mode")
 	flag.IntVar(&cfg.KeepaliveInterval, "keepalive_interval", 10, "keep alive interval")
 	flag.IntVar(&cfg.KeepaliveMax, "keepalive_max", 5, "keep alive max")
-	flag.BoolVar(&cfg.DisableObfsAfterHandshake, "disable_obfs_after_handshake", false, "disable obfs after handshake")
 	flag.Usage = usage
 	flag.Parse()
 
@@ -192,16 +192,24 @@ func main() {
 		log.Fatal(err)
 	}
 
-	conf := &obfssh.Conf{
-		ObfsMethod:                cfg.ObfsMethod,
-		ObfsKey:                   cfg.ObfsKey,
-		Timeout:                   time.Duration(cfg.KeepaliveInterval*2) * time.Second,
-		KeepAliveInterval:         time.Duration(cfg.KeepaliveInterval) * time.Second,
-		KeepAliveMax:              cfg.KeepaliveMax,
-		DisableObfsAfterHandshake: cfg.DisableObfsAfterHandshake,
+	tlsConn := c
+	if cfg.TLS {
+		tlsConn = tls.Client(c, &tls.Config{
+			ServerName:         host,
+			InsecureSkipVerify: cfg.TLSInsecure,
+		})
+		if err := tlsConn.(*tls.Conn).Handshake(); err != nil {
+			log.Fatal(err)
+		}
 	}
 
-	client, err := obfssh.NewClient(c, config, rhost, conf)
+	conf := &obfssh.Conf{
+		Timeout:           time.Duration(cfg.KeepaliveInterval*2) * time.Second,
+		KeepAliveInterval: time.Duration(cfg.KeepaliveInterval) * time.Second,
+		KeepAliveMax:      cfg.KeepaliveMax,
+	}
+
+	client, err := obfssh.NewClient(tlsConn, config, rhost, conf)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -382,23 +390,6 @@ Options:
       Specifies the max error count for keep alive,
       when the count reach the max, the connection will
       be abort.
-
-Options for obfuscation:
-    -obfs_method method
-      Specifies the encryption method.
-      when this option is specified, the entire connection 
-      will be encrypted.
-      when set to none, the encryption is disabled.
-      Avaliable methods: rc4, aes, none(default)
-
-    -obfs_key key
-      Specifies the key to encrypt the connection,
-      if the server enable the obfs, only known the
-      right key can connect to the server.
-
-    -disable_obfs_after_handshake
-      when this option is specified, only encrypt the
-      ssh handshake message.
 `
 	fmt.Printf("%s", usageStr)
 	os.Exit(1)

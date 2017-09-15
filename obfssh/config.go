@@ -44,22 +44,21 @@ func (lf *stringSlice) String() string {
 }
 
 type config struct {
-	Host                      string      `yaml:"host"`
-	Port                      int         `yaml:"port"`
-	PrivateKey                string      `yaml:"private_key"`
-	ObfsMethod                string      `yaml:"obfs_method"`
-	ObfsKey                   string      `yaml:"obfs_key"`
-	Username                  string      `yaml:"username"`
-	Password                  string      `yaml:"password"`
-	KeepaliveInterval         int         `yaml:"keepalive_interval"`
-	KeepaliveMax              int         `yaml:"keepalive_max"`
-	Debug                     bool        `yaml:"debug"`
-	DisableObfsAfterHandshake bool        `yaml:"disable_obfs_after_handshake"`
-	NotRunCmd                 bool        `yaml:"not_run_cmd"`
-	LocalForwards             stringSlice `yaml:"local_forward"`
-	RemoteForwards            stringSlice `yaml:"remote_forward"`
-	DynamicForwards           stringSlice `yaml:"dynamic_forward"`
-	Proxy                     proxy
+	Host              string      `yaml:"host"`
+	Port              int         `yaml:"port"`
+	TLS               bool        `yaml:"tls"`
+	TLSInsecure       bool        `yaml:"tls-insecure"`
+	PrivateKey        string      `yaml:"private_key"`
+	Username          string      `yaml:"username"`
+	Password          string      `yaml:"password"`
+	KeepaliveInterval int         `yaml:"keepalive_interval"`
+	KeepaliveMax      int         `yaml:"keepalive_max"`
+	Debug             bool        `yaml:"debug"`
+	NotRunCmd         bool        `yaml:"not_run_cmd"`
+	LocalForwards     stringSlice `yaml:"local_forward"`
+	RemoteForwards    stringSlice `yaml:"remote_forward"`
+	DynamicForwards   stringSlice `yaml:"dynamic_forward"`
+	Proxy             proxy
 }
 
 type proxy struct {

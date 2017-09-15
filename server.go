@@ -5,6 +5,7 @@ import (
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 	"net"
+	"time"
 )
 
 // Server is server connection
@@ -21,30 +22,17 @@ type Server struct {
 //
 // config is &ssh.ServerConfig
 //
-// method is obfs encrypt method, value is rc4, aes or none or ""
-//
-// key is obfs encrypt key
-//
 // conf is the server configure
 //
-// if set method to none or "", means disable obfs encryption, when the obfs is disabled,
-// the server can accept connection from standard ssh client, like OpenSSH client
 //
 func NewServer(c net.Conn, config *ssh.ServerConfig, conf *Conf) (*Server, error) {
-	wc, err := NewObfsConn(c, conf.ObfsMethod, conf.ObfsKey, true)
-	if err != nil {
-		return nil, err
-	}
-	sshConn, ch, req, err := ssh.NewServerConn(wc, config)
+	sshConn, ch, req, err := ssh.NewServerConn(&TimedOutConn{c, 15 * 60 * time.Second}, config)
 	if err != nil {
 		return nil, err
 	}
 
-	if conf.DisableObfsAfterHandshake {
-		wc.DisableObfs()
-	}
-
-	sc := &Server{conn: c,
+	sc := &Server{
+		conn:           c,
 		sshConn:        sshConn,
 		forwardedPorts: map[string]net.Listener{},
 		exitCh:         make(chan struct{})}

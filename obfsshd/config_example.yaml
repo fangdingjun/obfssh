@@ -4,30 +4,18 @@
 
 # port
 # the ssh port listen on
-port: 2022
-
-# obfs_key
-#
-# Specifies the key to encrypt the connection,
-# if obfs enabled, only client known this key
-# can connect
-obfs_key: some_keyword
+listen:
+    -  
+      port: 2022
+      key:
+      cert:
+    - 
+      port: 2023
+      key: server.key
+      cert: server.crt
 
 # ssh host key file
 host_key_file: ./ssh_host_rsa_key
-
-# obfs_method
-#
-# Specifies the encryption method.
-# when this option is specified, the entire connection 
-# will be encrypted.
-# when set to none, the encryption is disabled.
-# Avaliable methods: rc4, aes, none(default)
-#
-obfs_method: "rc4"
-
-# when set to true, only the ssh handshake packet is encrypted
-disable_obfs_after_handshake: true
 
 # show more log message
 # value true or false

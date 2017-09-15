@@ -1,16 +1,7 @@
 obfssh
 =====
 
-obfssh is wrapper for ssh protocol, use AES or RC4 to encrypt the transport data,
-ssh is a good designed protocol and with the good encryption, but the protocol has a especially figerprint,
-the firewall can easily identify the protocol and block it or QOS it, especial when we use its port forward function to escape from the state censorship.
-
-obfssh encrypt the ssh protocol and hide the figerprint, the firewall can not identify the protocol.
-
-We borrow the idea from https://github.com/brl/obfuscated-openssh, but not compatible with it,
-beause the limitions of golang ssh library.
-
-
+obfssh is wrapper for golang.org/x/crypto/ssh protocol, add support for listen or connect ssh via TLS
 
 
 server usage example
@@ -19,11 +10,6 @@ server usage example
 	import "github.com/fangdingjun/obfssh"
 	import "golang.org/x/crypto/ssh"
 
-	// key for encryption
-	obfs_key := "some keyword"
-
-	// encrypt method
-	obfs_method := "rc4"
 
 	config := &ssh.ServerConfig{
 		// add ssh server configure here
@@ -31,10 +17,18 @@ server usage example
 		...
 	}
 
-	l, err := net.Listen(":2022")
+    var l net.Listener
+    var err error
+    if useTLS{
+        cert, err := tls.LoadX509KeyPair(certFile, keyFile)
+        l, err = tls.Listen("tcp", ":2022", &tls.Config{
+            Certificates: []tls.Certificate{cert},
+    }else{
+        l, err = net.Listen(":2022")
+    }
 	c, err := l.Accept()
 
-	sc, err := obfssh.NewServer(c, config, obfs_method, obfs_key)
+	sc, err := obfssh.NewServer(c, config, &obfssh.Conf{})
 
 	sc.Run()
 
@@ -48,22 +42,25 @@ client usage example
 
 	addr := "localhost:2022"
 
-	// key for encryption
-	obfs_key := "some keyword"
-
-	// encrypt method
-	obfs_method := "rc4"
-
 	config := ssh.ClientConfig{
 		// add ssh client config here
 		// for example auth method
 		...
 	}
-
-	c, err := net.Dial("tcp", addr)
+    
+    var c net.Conn
+    var err error 
+    if useTLS{
+        c, err = tls.Dial("tcp", addr, &tls.Config{
+            ServerName: "localhost",
+            InsecureSkipVerify: true,
+        }
+    }else{
+        c, err = net.Dial("tcp", addr)
+    }
 
 	// create connection
-	client, err := obfssh.NewClient(c, config, addr, obfs_method, obfs_key)
+	client, err := obfssh.NewClient(c, config, addr, &obfssh.Conf{})
 
 	// local to remote port forward
 	client.AddLocalForward(":2234:10.0.0.1:3221")
@@ -83,7 +80,6 @@ limitions
  
  now, the server side only implements the port forward function, start shell or execute a command is not suppurted
 
- if set the `obfs_method` to `none`, obfssh is compatible with standard ssh server/client(OpenSSH)
 
 License
 =======

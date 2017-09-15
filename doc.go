@@ -1,7 +1,7 @@
 package obfssh
 
 /*
-obfssh is wrapper for ssh protocol, use AES or RC4 to encrypt the transport data,
+Package obfssh is wrapper for ssh protocol, use AES or RC4 to encrypt the transport data,
 ssh is a good designed protocol and with the good encryption, but the protocol has a especially figerprint,
 the firewall can easily identify the protocol and block it or QOS it, especial when we use its port forward function to escape from the state censorship.
 

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"github.com/fangdingjun/obfssh"
@@ -28,11 +29,7 @@ func main() {
 		obfssh.SSHLogLevel = obfssh.DEBUG
 	}
 
-	sconf := &obfssh.Conf{
-		ObfsMethod:                conf.Method,
-		ObfsKey:                   conf.Key,
-		DisableObfsAfterHandshake: conf.DisableObfsAfterHandshake,
-	}
+	sconf := &obfssh.Conf{}
 
 	config := &ssh.ServerConfig{
 		PasswordCallback: func(c ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
@@ -77,29 +74,49 @@ func main() {
 	}
 
 	config.AddHostKey(private)
-	l, err := net.Listen("tcp", fmt.Sprintf(":%d", conf.Port))
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer l.Close()
-	for {
-		c, err := l.Accept()
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-
-		obfssh.Log(obfssh.DEBUG, "accept tcp connection from %s", c.RemoteAddr())
-
-		go func(c net.Conn) {
-			sc, err := obfssh.NewServer(c, config, sconf)
-			if err != nil {
-				c.Close()
-				obfssh.Log(obfssh.ERROR, "%s", err.Error())
-				return
+	for _, lst := range conf.Listen {
+		go func(lst listen) {
+			var l net.Listener
+			var err error
+			if lst.Key == "" || lst.Cert == "" {
+				l, err = net.Listen("tcp", fmt.Sprintf(":%d", lst.Port))
+			} else {
+				cert, err := tls.LoadX509KeyPair(lst.Cert, lst.Key)
+				if err != nil {
+					log.Fatal(err)
+				}
+				l, err = tls.Listen("tcp", fmt.Sprintf(":%d", lst.Port), &tls.Config{
+					Certificates: []tls.Certificate{cert},
+				})
 			}
-			sc.Run()
-		}(c)
+
+			if err != nil {
+				log.Fatal(err)
+			}
+			defer l.Close()
+
+			for {
+				c, err := l.Accept()
+				if err != nil {
+					fmt.Println(err)
+					return
+				}
+
+				obfssh.Log(obfssh.DEBUG, "accept tcp connection from %s", c.RemoteAddr())
+
+				go func(c net.Conn) {
+					defer c.Close()
+					sc, err := obfssh.NewServer(c, config, sconf)
+					if err != nil {
+						c.Close()
+						obfssh.Log(obfssh.ERROR, "%s", err.Error())
+						return
+					}
+					sc.Run()
+				}(c)
+			}
+		}(lst)
 	}
+	select {}
 
 }

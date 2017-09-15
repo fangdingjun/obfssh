@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"errors"
 	"flag"
 	"fmt"
@@ -26,6 +27,8 @@ type options struct {
 	Port                      int
 	User                      string
 	Passwd                    string
+	TLS                       bool
+	TLSInsecure               bool
 	Recursive                 bool
 	ObfsMethod                string
 	ObfsKey                   string
@@ -40,12 +43,11 @@ func main() {
 	flag.BoolVar(&cfg.Debug, "d", false, "verbose mode")
 	flag.IntVar(&cfg.Port, "p", 22, "port")
 	flag.StringVar(&cfg.User, "l", os.Getenv("USER"), "user")
+	flag.BoolVar(&cfg.TLS, "tls", false, "use tls or not")
+	flag.BoolVar(&cfg.TLSInsecure, "tls-insecure", false, "insecure tls connection")
 	flag.StringVar(&cfg.Passwd, "pw", "", "password")
 	flag.StringVar(&cfg.PrivateKey, "i", "", "private key")
 	flag.BoolVar(&cfg.Recursive, "r", false, "recursively copy entries")
-	flag.StringVar(&cfg.ObfsMethod, "obfs_method", "none", "obfs encrypt method, rc4, aes or none")
-	flag.StringVar(&cfg.ObfsKey, "obfs_key", "", "obfs encrypt key")
-	flag.BoolVar(&cfg.DisableObfsAfterHandshake, "disable_obfs_after_handshake", false, "disable obfs after handshake")
 	flag.Parse()
 
 	if cfg.Debug {
@@ -146,23 +148,33 @@ func createSFTPConn(host, user string, cfg *options) (*sftp.Client, error) {
 		User:    user,
 		Auth:    auths,
 		Timeout: 5 * time.Second,
+		HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+			return nil
+		},
 	}
 
 	rhost := net.JoinHostPort(host, fmt.Sprintf("%d", cfg.Port))
 
-	c, err := net.Dial("tcp", rhost)
+	var c net.Conn
+	var err error
+	if cfg.TLS {
+		c, err = tls.Dial("tcp", rhost, &tls.Config{
+			ServerName:         host,
+			InsecureSkipVerify: cfg.TLSInsecure,
+		})
+	} else {
+		c, err = net.Dial("tcp", rhost)
+	}
+
 	if err != nil {
 		//log.Fatal(err)
 		return nil, err
 	}
 
 	conf := &obfssh.Conf{
-		ObfsMethod:                cfg.ObfsMethod,
-		ObfsKey:                   cfg.ObfsKey,
-		Timeout:                   10 * time.Second,
-		KeepAliveInterval:         10 * time.Second,
-		KeepAliveMax:              5,
-		DisableObfsAfterHandshake: cfg.DisableObfsAfterHandshake,
+		Timeout:           10 * time.Second,
+		KeepAliveInterval: 10 * time.Second,
+		KeepAliveMax:      5,
 	}
 
 	conn, err := obfssh.NewClient(c, config, rhost, conf)
@@ -599,23 +611,6 @@ Options:
       Specifies the password for log in remote machine
 
     -r recursively copy the directories
-     
-Options for obfuscation:
-    -obfs_method method
-      Specifies the encryption method.
-      when this option is specified, the entire connection 
-      will be encrypted.
-      when set to none, the encryption is disabled.
-      Avaliable methods: rc4, aes, none(default)
-
-    -obfs_key key
-      Specifies the key to encrypt the connection,
-      if the server enable the obfs, only known the
-      right key can connect to the server.
-
-    -disable_obfs_after_handshake
-      when this option is specified, only encrypt the
-      ssh handshake message.
 `
 	fmt.Printf("%s", usageStr)
 	os.Exit(1)
