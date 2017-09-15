@@ -23,14 +23,21 @@ server usage example
         cert, err := tls.LoadX509KeyPair(certFile, keyFile)
         l, err = tls.Listen("tcp", ":2022", &tls.Config{
             Certificates: []tls.Certificate{cert},
+        }
     }else{
         l, err = net.Listen(":2022")
     }
-	c, err := l.Accept()
+    
+    defer l.Close()
 
-	sc, err := obfssh.NewServer(c, config, &obfssh.Conf{})
-
-	sc.Run()
+    for {
+        c, err := l.Accept()
+        go func(c net.Conn){
+            defer c.Close()
+            sc, err := obfssh.NewServer(c, config, &obfssh.Conf{})
+            sc.Run()
+        }(c)
+    }
 
 
 client usage example
