@@ -611,6 +611,12 @@ Options:
       Specifies the password for log in remote machine
 
     -r recursively copy the directories
+
+    -tls
+      connect to server via TLS
+
+    -tls-insecure
+      do not verify server's certificate
 `
 	fmt.Printf("%s", usageStr)
 	os.Exit(1)

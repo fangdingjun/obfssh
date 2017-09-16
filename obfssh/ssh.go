@@ -390,6 +390,12 @@ Options:
       Specifies the max error count for keep alive,
       when the count reach the max, the connection will
       be abort.
+	
+    -tls
+       connect to server via TLS
+
+    -tls-insecure
+       do not verify server's tls ceritificate
 `
 	fmt.Printf("%s", usageStr)
 	os.Exit(1)
