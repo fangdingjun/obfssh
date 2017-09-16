@@ -1,16 +1,16 @@
 obfssh\_scp
 =========
 
-obfssh\_scp is a scp style sftp client support use obfssh encryption
+obfscp is a scp style sftp client by golang, support connect to server via TLS
 
 
 usage
 ====
 
-    obfssh\_scp user@host:/path/to/file local
+    obfscp user@host:/path/to/file local
 
 or 
 
 
-    obfssh\_scp local user@host:/path/to/file
+    obfscp local user@host:/path/to/file
 
