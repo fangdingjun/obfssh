@@ -14,6 +14,18 @@
 
 # port: 2223
 
+# tls
+#
+# connect to server via TLS
+#
+# tls: true
+
+# tls-insecure
+#
+# do not verify server's TLS certificate
+#
+# tls-insecure: true
+
 # proxy
 # the proxy server to connect to
 #  supported scheme: http, https, socks5
@@ -39,27 +51,6 @@
 #   port: 443
 #   sni: example.com
 #   insecure: false
-
-
-# obfs_method
-#
-# Specifies the encryption method.
-# when this option is specified, the entire connection 
-# will be encrypted.
-# when set to none, the encryption is disabled.
-# Avaliable methods: rc4, aes, none(default)
-
-# obfs_method: rc4
-
-
-# obfs_key
-#
-# Specifies the key to encrypt the connection,
-# if the server enable the obfs, only known the
-# right key can connect to the server.
-
-#obfs_key: some_keyword
-
 
 # username
 #
