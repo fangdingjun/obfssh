@@ -5,6 +5,8 @@ import (
 	"time"
 )
 
+var dialer = &net.Dialer{Timeout: 10 * time.Second}
+
 // TimedOutConn is a net.Conn with read/write timeout set
 type TimedOutConn struct {
 	net.Conn

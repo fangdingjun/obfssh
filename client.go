@@ -232,7 +232,7 @@ func (cc *Client) handleLocalForward(conn net.Conn, remote string) {
 }
 
 func (cc *Client) handleRemoteForward(conn net.Conn, local string) {
-	lconn, err := net.Dial("tcp", local)
+	lconn, err := dialer.Dial("tcp", local)
 	if err != nil {
 		Log(ERROR, "connect to %s failed: %s", local, err.Error())
 		conn.Close()

@@ -182,7 +182,7 @@ func handleDirectTcpip(newch ssh.NewChannel) {
 
 	Log(DEBUG, "create connection to %s:%d", r.Raddr, r.Rport)
 
-	rconn, err := net.Dial("tcp", net.JoinHostPort(r.Raddr, fmt.Sprintf("%d", r.Rport)))
+	rconn, err := dialer.Dial("tcp", net.JoinHostPort(r.Raddr, fmt.Sprintf("%d", r.Rport)))
 	if err != nil {
 		Log(ERROR, "%s", err.Error())
 		newch.Reject(ssh.ConnectionFailed, "invalid argument")
