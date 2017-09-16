@@ -17,6 +17,8 @@ import (
 	"time"
 )
 
+var dialer = &net.Dialer{Timeout: 10 * time.Second}
+
 func main() {
 	var configfile string
 	var cfg config
@@ -185,7 +187,7 @@ func main() {
 			err = fmt.Errorf("unsupported scheme: %s", cfg.Proxy.Scheme)
 		}
 	} else {
-		c, err = net.Dial("tcp", rhost)
+		c, err = dialer.Dial("tcp", rhost)
 	}
 
 	if err != nil {

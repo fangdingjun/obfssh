@@ -84,7 +84,8 @@ func (cc *Client) Close() {
 		l.Close()
 	}
 	//Log(DEBUG, "close ssh connection")
-	//cc.sshConn.Close()
+	cc.sshConn.Close()
+	cc.conn.Close()
 }
 
 // RunCmd run a single command on server
@@ -290,7 +291,8 @@ func (cc *Client) keepAlive(interval time.Duration, maxCount int) {
 			if count >= maxCount {
 				cc.err = fmt.Errorf("keep alive detects connection hang up")
 				Log(ERROR, "keep alive hit max count, exit")
-				cc.sshConn.Close()
+				//cc.sshConn.Close()
+				//cc.conn.Close()
 				// send exit signal
 				close(cc.ch)
 				return
