@@ -36,6 +36,8 @@ type options struct {
 	PrivateKey                string
 }
 
+var dialer = &net.Dialer{Timeout: 10 * time.Second}
+
 func main() {
 	var cfg options
 	flag.Usage = usage
@@ -158,12 +160,12 @@ func createSFTPConn(host, user string, cfg *options) (*sftp.Client, error) {
 	var c net.Conn
 	var err error
 	if cfg.TLS {
-		c, err = tls.Dial("tcp", rhost, &tls.Config{
+		c, err = tls.DialWithDialer(dialer, "tcp", rhost, &tls.Config{
 			ServerName:         host,
 			InsecureSkipVerify: cfg.TLSInsecure,
 		})
 	} else {
-		c, err = net.Dial("tcp", rhost)
+		c, err = dialer.Dial("tcp", rhost)
 	}
 
 	if err != nil {
