@@ -17,7 +17,7 @@ import (
 	"time"
 )
 
-var dialer = &net.Dialer{Timeout: 10 * time.Second}
+var dialer = &net.Dialer{Timeout: 15 * time.Second}
 
 func main() {
 	var configfile string
