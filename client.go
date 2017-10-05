@@ -281,13 +281,23 @@ func (cc *Client) keepAlive(interval time.Duration, maxCount int) {
 	for {
 		select {
 		case <-c.C:
-			_, _, err := cc.sshConn.SendRequest("keepalive@openssh.org", true, nil)
-			if err != nil {
-				Log(DEBUG, "keep alive error: %s", err.Error())
+			resCh := make(chan error, 1)
+			go func(resCh chan error) {
+				_, _, err := cc.sshConn.SendRequest("keepalive@openssh.org", true, nil)
+				resCh <- err
+			}(resCh)
+			select {
+			case err := <-resCh:
+				if err != nil {
+					Log(DEBUG, "keep alive error: %s", err.Error())
+					count++
+				} else {
+					count = 0
+				}
+			case <-time.After(3 * time.Second):
 				count++
-			} else {
-				count = 0
 			}
+
 			if count >= maxCount {
 				cc.err = fmt.Errorf("keep alive detects connection hang up")
 				Log(ERROR, "keep alive hit max count, exit")
