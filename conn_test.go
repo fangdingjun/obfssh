@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func testTimedOutConn(t *testing.T, timeout bool) {
+func testTimedOutConn(t *testing.T, _timeout bool) {
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("listen failed: %s", err)
@@ -37,7 +37,7 @@ func testTimedOutConn(t *testing.T, timeout bool) {
 			t.Fatalf("server read failed: %s", err)
 		}
 
-		if timeout {
+		if _timeout {
 			time.Sleep(timeout + 1*time.Second)
 		}
 
@@ -62,7 +62,7 @@ func testTimedOutConn(t *testing.T, timeout bool) {
 	buf := make([]byte, 100)
 
 	n, err := cConn.Read(buf)
-	if timeout {
+	if _timeout {
 		if err == nil {
 			t.Errorf("expeced timeout error, got nil")
 		} else {

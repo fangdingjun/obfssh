@@ -4,10 +4,6 @@ import (
 	"crypto/tls"
 	"flag"
 	"fmt"
-	"github.com/bgentry/speakeasy"
-	"github.com/fangdingjun/obfssh"
-	"golang.org/x/crypto/ssh"
-	"golang.org/x/crypto/ssh/agent"
 	"io/ioutil"
 	"log"
 	"net"
@@ -15,6 +11,11 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/bgentry/speakeasy"
+	"github.com/fangdingjun/obfssh"
+	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/agent"
 )
 
 var dialer = &net.Dialer{Timeout: 15 * time.Second}
@@ -268,6 +269,19 @@ func main() {
 		if err := client.AddDynamicForward(local); err != nil {
 			log.Println(err)
 		}
+	}
+
+	for _, p := range cfg.DynamicHTTP {
+		if strings.Index(p, ":") == -1 {
+			local = fmt.Sprintf(":%s", p)
+		} else {
+			local = p
+		}
+		//log.Printf("listen on %s", local)
+		if err := client.AddDynamicHTTPForward(local); err != nil {
+			log.Println(err)
+		}
+
 	}
 
 	hasErr := false

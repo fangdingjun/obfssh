@@ -2,9 +2,10 @@ package main
 
 import (
 	"flag"
-	"github.com/go-yaml/yaml"
 	"io/ioutil"
 	"strings"
+
+	"github.com/go-yaml/yaml"
 )
 
 // stringSlice implemnts the flag.Value interface
@@ -58,6 +59,7 @@ type config struct {
 	LocalForwards     stringSlice `yaml:"local_forward"`
 	RemoteForwards    stringSlice `yaml:"remote_forward"`
 	DynamicForwards   stringSlice `yaml:"dynamic_forward"`
+	DynamicHTTP       stringSlice `yaml:"dynamic_http"`
 	Proxy             proxy
 }
 

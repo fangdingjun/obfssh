@@ -1,15 +1,20 @@
 package obfssh
 
 import (
+	"bufio"
 	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"os"
+	"os/signal"
+	"strings"
+	"syscall"
+	"time"
+
 	socks "github.com/fangdingjun/socks-go"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/terminal"
-	"net"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
 )
 
 // Client is ssh client connection
@@ -332,4 +337,111 @@ func (cc *Client) registerSignal() {
 		default:
 		}
 	}
+}
+
+// AddDynamicHTTPForward add a http dynamic forward through
+//  secure channel
+func (cc *Client) AddDynamicHTTPForward(addr string) error {
+	l, err := net.Listen("tcp", addr)
+	if err != nil {
+		Log(ERROR, "listen on %s failed, %s", addr, err)
+		return err
+	}
+
+	cc.listeners = append(cc.listeners, l)
+
+	go func(l net.Listener) {
+		// defer l.Close()
+		for {
+			c, err := l.Accept()
+			if err != nil {
+				Log(ERROR, "accept error %s", err)
+				break
+			}
+			go cc.handleHTTPIncoming(c)
+		}
+	}(l)
+	return nil
+}
+
+func (cc *Client) handleHTTPIncoming(c net.Conn) {
+	defer c.Close()
+
+	r := bufio.NewReader(c)
+
+	req, err := http.ReadRequest(r)
+	if err != nil {
+		Log(ERROR, "read http request error %s", err)
+		return
+	}
+
+	if req.Method == "CONNECT" {
+		cc.handleConnect(req, c)
+		return
+	}
+	cc.handleHTTPReq(req, c)
+}
+
+func (cc *Client) handleConnect(req *http.Request, c net.Conn) {
+	Log(DEBUG, "connect to %s", req.RequestURI)
+
+	c1, err := cc.client.Dial("tcp", req.RequestURI)
+	if err != nil {
+		fmt.Fprintf(c, "HTTP/1.0 503 connection failed\r\n\r\n")
+		Log(ERROR, "dial error %s", err)
+		return
+	}
+
+	defer c1.Close()
+
+	fmt.Fprintf(c, "HTTP/1.0 200 connection established\r\n\r\n")
+
+	ch := make(chan struct{}, 2)
+	go func() {
+		io.Copy(c1, c)
+		ch <- struct{}{}
+	}()
+
+	go func() {
+		io.Copy(c, c1)
+		ch <- struct{}{}
+	}()
+
+	<-ch
+}
+
+func (cc *Client) handleHTTPReq(req *http.Request, c net.Conn) {
+	host := req.Host
+	if !strings.Contains(host, ":") {
+		host = fmt.Sprintf("%s:80", host)
+	}
+
+	Log(DEBUG, "request to %s", host)
+	c1, err := cc.client.Dial("tcp", host)
+	if err != nil {
+		fmt.Fprintf(c, "HTTP/1.1 503 connection failed\r\nConnection: close\r\n\r\n")
+		Log(ERROR, "connection failed %s", err)
+		return
+	}
+	defer c1.Close()
+
+	if err = req.Write(c1); err != nil {
+		fmt.Fprintf(c, "HTTP/1.1 503 write to server error\r\nConnection: close\r\n\r\n")
+		Log(ERROR, "write request to server error %s", err)
+		return
+	}
+
+	ch := make(chan struct{}, 2)
+
+	go func() {
+		io.Copy(c1, c)
+		ch <- struct{}{}
+	}()
+
+	go func() {
+		io.Copy(c, c1)
+		ch <- struct{}{}
+	}()
+
+	<-ch
 }

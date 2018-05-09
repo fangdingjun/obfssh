@@ -154,3 +154,16 @@
 # dynamic_forward:
 #    - :3224
 #    - 127.0.0.1:9883
+
+
+# dynamic_http
+#
+# Listen a port to accept http request incoming 
+# and dynamic forward the request
+# to remote server through secure channel.
+# This option can be specified multiple times.
+# format [bind_adress:]port
+
+# dynamic_http:
+#    - :8080
+#    - :127.0.0.1:8180

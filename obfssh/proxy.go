@@ -4,8 +4,6 @@ import (
 	"bufio"
 	"crypto/tls"
 	"fmt"
-	"github.com/fangdingjun/obfssh"
-	socks "github.com/fangdingjun/socks-go"
 	"io"
 	"net"
 	"net/textproto"
@@ -14,6 +12,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/fangdingjun/obfssh"
+	socks "github.com/fangdingjun/socks-go"
 )
 
 type httpProxyConn struct {
