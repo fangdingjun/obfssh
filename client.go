@@ -35,8 +35,8 @@ type Client struct {
 //
 //
 func NewClient(c net.Conn, config *ssh.ClientConfig, addr string, conf *Conf) (*Client, error) {
-	obfsConn := &TimedOutConn{c, conf.Timeout}
-	sshConn, newch, reqs, err := ssh.NewClientConn(obfsConn, addr, config)
+	//obfsConn := &TimedOutConn{c, conf.Timeout}
+	sshConn, newch, reqs, err := ssh.NewClientConn(c, addr, config)
 	if err != nil {
 		return nil, err
 	}
@@ -342,6 +342,7 @@ func (cc *Client) registerSignal() {
 // AddDynamicHTTPForward add a http dynamic forward through
 //  secure channel
 func (cc *Client) AddDynamicHTTPForward(addr string) error {
+	Log(DEBUG, "add dynamic http listen: %s", addr)
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
 		Log(ERROR, "listen on %s failed, %s", addr, err)

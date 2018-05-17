@@ -51,6 +51,8 @@ func main() {
 		obfssh.SSHLogLevel = obfssh.DEBUG
 	}
 
+	obfssh.Log(obfssh.DEBUG, "obfssh client start")
+
 	auth := []ssh.AuthMethod{}
 
 	var agentConn net.Conn
@@ -188,6 +190,7 @@ func main() {
 			err = fmt.Errorf("unsupported scheme: %s", cfg.Proxy.Scheme)
 		}
 	} else {
+		obfssh.Log(obfssh.DEBUG, "dail to %s", rhost)
 		c, err = dialer.Dial("tcp", rhost)
 	}
 
@@ -195,27 +198,39 @@ func main() {
 		log.Fatal(err)
 	}
 
-	tlsConn := c
+	obfssh.Log(obfssh.DEBUG, "dail success")
+
+	timeout := time.Duration(cfg.KeepaliveInterval*2) * time.Second
+
+	var _conn = c
+
+	conn := &obfssh.TimedOutConn{Conn: c, Timeout: timeout}
+
 	if cfg.TLS {
-		tlsConn = tls.Client(c, &tls.Config{
+		obfssh.Log(obfssh.DEBUG, "begin tls handshake")
+		_conn = tls.Client(conn, &tls.Config{
 			ServerName:         host,
 			InsecureSkipVerify: cfg.TLSInsecure,
 		})
-		if err := tlsConn.(*tls.Conn).Handshake(); err != nil {
+		if err := _conn.(*tls.Conn).Handshake(); err != nil {
 			log.Fatal(err)
 		}
+		obfssh.Log(obfssh.DEBUG, "tls handshake done")
 	}
 
 	conf := &obfssh.Conf{
-		Timeout:           time.Duration(cfg.KeepaliveInterval*2) * time.Second,
+		Timeout:           timeout,
 		KeepAliveInterval: time.Duration(cfg.KeepaliveInterval) * time.Second,
 		KeepAliveMax:      cfg.KeepaliveMax,
 	}
 
-	client, err := obfssh.NewClient(tlsConn, config, rhost, conf)
+	obfssh.Log(obfssh.DEBUG, "ssh negotation")
+	client, err := obfssh.NewClient(_conn, config, rhost, conf)
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	obfssh.Log(obfssh.DEBUG, "ssh negotation success")
 
 	var local, remote string
 
@@ -308,6 +323,7 @@ func main() {
 		hasErr = true
 	}
 
+	obfssh.Log(obfssh.DEBUG, "obfssh client exit")
 	if hasErr {
 		os.Exit(1)
 	}
