@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/fangdingjun/go-log"
 	socks "github.com/fangdingjun/socks-go"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/terminal"
@@ -62,11 +63,11 @@ func (cc *Client) Run() error {
 	}
 	// wait port forward to finish
 	if cc.listeners != nil {
-		Log(DEBUG, "wait all channel to be done")
+		log.Debugf("wait all channel to be done")
 		go cc.registerSignal()
 		go func() {
 			cc.err = cc.sshConn.Wait()
-			Log(DEBUG, "connection hang up")
+			log.Debugf("connection hang up")
 			//close(cc.ch)
 			select {
 			case cc.ch <- struct{}{}:
@@ -77,11 +78,11 @@ func (cc *Client) Run() error {
 		// wait exit signal
 		select {
 		case <-cc.ch:
-			Log(INFO, "got signal, exit")
+			log.Debugf("got signal, exit")
 		}
 	}
 	cc.Close()
-	Log(DEBUG, "Done")
+	log.Debugf("Done")
 	return cc.err
 }
 
@@ -96,9 +97,9 @@ func (cc *Client) closeListener() {
 	wg := &sync.WaitGroup{}
 	for _, l := range cc.listeners {
 		go func(l net.Listener) {
-			Log(DEBUG, "begin to close listener %s", l.Addr().String())
+			log.Debugf("begin to close listener %s", l.Addr().String())
 			l.Close()
-			Log(DEBUG, "close listener %s done", l.Addr().String())
+			log.Debugf("close listener %s done", l.Addr().String())
 			wg.Done()
 		}(l)
 		wg.Add(1)
@@ -121,20 +122,20 @@ func (cc *Client) closeListener() {
 func (cc *Client) Close() {
 	cc.closeListener()
 
-	Log(DEBUG, "close ssh connection")
+	log.Debugf("close ssh connection")
 	cc.sshConn.Close()
 	cc.conn.Close()
-	Log(DEBUG, "close ssh connection done")
+	log.Debugf("close ssh connection done")
 }
 
 // RunCmd run a single command on server
 func (cc *Client) RunCmd(cmd string) ([]byte, error) {
-	Log(INFO, "run command %s", cmd)
+	log.Debugf("run command %s", cmd)
 	session, err := cc.client.NewSession()
 	if err != nil {
-		Log(DEBUG, "command exited with error: %s", err.Error())
+		log.Debugf("command exited with error: %s", err.Error())
 	} else {
-		Log(DEBUG, "command exited with no error")
+		log.Debugf("command exited with no error")
 	}
 
 	if err != nil {
@@ -147,7 +148,7 @@ func (cc *Client) RunCmd(cmd string) ([]byte, error) {
 
 // Shell start a login shell on server
 func (cc *Client) Shell() error {
-	Log(DEBUG, "request new session")
+	log.Debugf("request new session")
 	session, err := cc.client.NewSession()
 	if err != nil {
 		return err
@@ -163,34 +164,34 @@ func (cc *Client) Shell() error {
 	}
 
 	// this make CTRL+C works
-	Log(DEBUG, "turn terminal mode to raw")
+	log.Debugf("turn terminal mode to raw")
 	oldState, _ := terminal.MakeRaw(0)
 	w, h, _ := terminal.GetSize(0)
-	Log(DEBUG, "request pty")
+	log.Debugf("request pty")
 	if err := session.RequestPty("xterm", h, w, modes); err != nil {
-		Log(ERROR, "request pty error: %s", err.Error())
-		Log(DEBUG, "restore terminal mode")
+		log.Errorf("request pty error: %s", err.Error())
+		log.Debugf("restore terminal mode")
 		terminal.Restore(0, oldState)
 		return err
 	}
-	Log(DEBUG, "request shell")
+	log.Debugf("request shell")
 	if err := session.Shell(); err != nil {
-		Log(ERROR, "start shell error: %s", err.Error())
-		Log(DEBUG, "restore terminal mode")
+		log.Errorf("start shell error: %s", err.Error())
+		log.Debugf("restore terminal mode")
 		terminal.Restore(0, oldState)
 		return err
 	}
 
 	session.Wait()
-	Log(DEBUG, "session closed")
+	log.Debugf("session closed")
 	terminal.Restore(0, oldState)
-	Log(DEBUG, "restore terminal mode")
+	log.Debugf("restore terminal mode")
 	return nil
 }
 
 // AddLocalForward add a local to remote port forward
 func (cc *Client) AddLocalForward(local, remote string) error {
-	Log(DEBUG, "add local forward %s -> %s", local, remote)
+	log.Debugf("add local forward %s -> %s", local, remote)
 	l, err := net.Listen("tcp", local)
 	if err != nil {
 		return err
@@ -201,10 +202,10 @@ func (cc *Client) AddLocalForward(local, remote string) error {
 		for {
 			c, err := l.Accept()
 			if err != nil {
-				Log(DEBUG, "local listen %s closed", l.Addr())
+				log.Debugf("local listen %s closed", l.Addr())
 				return
 			}
-			Log(DEBUG, "connection accepted from %s", c.RemoteAddr())
+			log.Debugf("connection accepted from %s", c.RemoteAddr())
 			go cc.handleLocalForward(c, remote)
 		}
 	}(l)
@@ -214,7 +215,7 @@ func (cc *Client) AddLocalForward(local, remote string) error {
 
 // AddRemoteForward add a remote to local port forward
 func (cc *Client) AddRemoteForward(local, remote string) error {
-	Log(DEBUG, "add remote forward %s -> %s", remote, local)
+	log.Debugf("add remote forward %s -> %s", remote, local)
 	l, err := cc.client.Listen("tcp", remote)
 	if err != nil {
 		return err
@@ -226,10 +227,10 @@ func (cc *Client) AddRemoteForward(local, remote string) error {
 		for {
 			c, err := l.Accept()
 			if err != nil {
-				Log(DEBUG, "remote listener %s closed", l.Addr())
+				log.Debugf("remote listener %s closed", l.Addr())
 				return
 			}
-			Log(DEBUG, "accept remote forward connection from %s", c.RemoteAddr())
+			log.Debugf("accept remote forward connection from %s", c.RemoteAddr())
 			go cc.handleRemoteForward(c, local)
 		}
 	}(l)
@@ -238,7 +239,7 @@ func (cc *Client) AddRemoteForward(local, remote string) error {
 
 // AddDynamicForward add a dynamic port forward
 func (cc *Client) AddDynamicForward(local string) error {
-	Log(DEBUG, "add dynamic forward %s", local)
+	log.Debugf("add dynamic forward %s", local)
 	l, err := net.Listen("tcp", local)
 	if err != nil {
 		return err
@@ -249,10 +250,10 @@ func (cc *Client) AddDynamicForward(local string) error {
 		for {
 			c, err := l.Accept()
 			if err != nil {
-				Log(DEBUG, "local listener %s closed", l.Addr())
+				log.Debugf("local listener %s closed", l.Addr())
 				return
 			}
-			Log(DEBUG, "accept connection from %s", c.RemoteAddr())
+			log.Debugf("accept connection from %s", c.RemoteAddr())
 			go cc.handleDynamicForward(c)
 		}
 	}(l)
@@ -262,22 +263,22 @@ func (cc *Client) AddDynamicForward(local string) error {
 func (cc *Client) handleLocalForward(conn net.Conn, remote string) {
 	rconn, err := cc.client.Dial("tcp", remote)
 	if err != nil {
-		Log(ERROR, "connect to %s failed: %s", remote, err.Error())
+		log.Errorf("connect to %s failed: %s", remote, err.Error())
 		conn.Close()
 		return
 	}
-	Log(DEBUG, "remote connect to %s success", remote)
+	log.Debugf("remote connect to %s success", remote)
 	PipeAndClose(rconn, conn)
 }
 
 func (cc *Client) handleRemoteForward(conn net.Conn, local string) {
 	lconn, err := dialer.Dial("tcp", local)
 	if err != nil {
-		Log(ERROR, "connect to %s failed: %s", local, err.Error())
+		log.Errorf("connect to %s failed: %s", local, err.Error())
 		conn.Close()
 		return
 	}
-	Log(DEBUG, "connect to %s success", local)
+	log.Debugf("connect to %s success", local)
 	PipeAndClose(conn, lconn)
 }
 
@@ -287,19 +288,19 @@ func (cc *Client) handleDynamicForward(conn net.Conn) {
 		if addr.String() != conn.LocalAddr().String() {
 			// transparent proxy
 			// iptables redirect the packet to this port
-			Log(DEBUG, "transparent %s -> %s", conn.RemoteAddr(), addr)
+			log.Debugf("transparent %s -> %s", conn.RemoteAddr(), addr)
 			cc.handleTransparentProxy(conn, addr)
 			return
 		}
 	} else {
 		// SO_ORIGNAL_DST failed
 		// just ignore it
-		Log(DEBUG, "get original destination on %s failed: %s, ignore",
+		log.Debugf("get original destination on %s failed: %s, ignore",
 			conn.LocalAddr(), err)
 	}
 
 	// socks5 to this port
-	Log(DEBUG, "socks %s", conn.RemoteAddr())
+	log.Debugf("socks %s", conn.RemoteAddr())
 	s := socks.Conn{Conn: conn, Dial: cc.client.Dial}
 	s.Serve()
 }
@@ -307,7 +308,7 @@ func (cc *Client) handleDynamicForward(conn net.Conn) {
 func (cc *Client) handleTransparentProxy(c net.Conn, addr net.Addr) {
 	c2, err := cc.client.Dial("tcp", addr.String())
 	if err != nil {
-		Log(ERROR, "%s", err)
+		log.Errorf("%s", err)
 		c.Close()
 		return
 	}
@@ -328,19 +329,19 @@ func (cc *Client) keepAlive(interval time.Duration, maxCount int) {
 			select {
 			case err := <-resCh:
 				if err != nil {
-					Log(DEBUG, "keep alive error: %s", err.Error())
+					log.Debugf("keep alive error: %s", err.Error())
 					count++
 				} else {
 					count = 0
 				}
 			case <-time.After(3 * time.Second):
-				Log(DEBUG, "keep alive timed out")
+				log.Debugf("keep alive timed out")
 				count++
 			}
 
 			if count >= maxCount {
 				cc.err = fmt.Errorf("keep alive detects connection hang up")
-				Log(ERROR, "keep alive hit max count, exit")
+				log.Errorf("keep alive hit max count, exit")
 				//cc.sshConn.Close()
 				//cc.conn.Close()
 				// send exit signal
@@ -361,7 +362,7 @@ func (cc *Client) registerSignal() {
 	select {
 	case s1 := <-c:
 		cc.err = fmt.Errorf("signal %v", s1)
-		Log(ERROR, "signal %d received, exit", s1)
+		log.Errorf("signal %d received, exit", s1)
 		//close(cc.ch)
 		select {
 		case cc.ch <- struct{}{}:
@@ -373,10 +374,10 @@ func (cc *Client) registerSignal() {
 // AddDynamicHTTPForward add a http dynamic forward through
 //  secure channel
 func (cc *Client) AddDynamicHTTPForward(addr string) error {
-	Log(DEBUG, "add dynamic http listen: %s", addr)
+	log.Debugf("add dynamic http listen: %s", addr)
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
-		Log(ERROR, "listen on %s failed, %s", addr, err)
+		log.Errorf("listen on %s failed, %s", addr, err)
 		return err
 	}
 
@@ -387,7 +388,7 @@ func (cc *Client) AddDynamicHTTPForward(addr string) error {
 		for {
 			c, err := l.Accept()
 			if err != nil {
-				Log(ERROR, "accept error %s", err)
+				log.Errorf("accept error %s", err)
 				break
 			}
 			go cc.handleHTTPIncoming(c)
@@ -403,7 +404,7 @@ func (cc *Client) handleHTTPIncoming(c net.Conn) {
 
 	req, err := http.ReadRequest(r)
 	if err != nil {
-		Log(ERROR, "read http request error %s", err)
+		log.Errorf("read http request error %s", err)
 		c.Close()
 		return
 	}
@@ -416,13 +417,13 @@ func (cc *Client) handleHTTPIncoming(c net.Conn) {
 }
 
 func (cc *Client) handleConnect(req *http.Request, c net.Conn) {
-	Log(DEBUG, "connect to %s", req.RequestURI)
+	log.Debugf("connect to %s", req.RequestURI)
 
 	c1, err := cc.client.Dial("tcp", req.RequestURI)
 	if err != nil {
 		c.Close()
 		fmt.Fprintf(c, "HTTP/1.0 503 connection failed\r\n\r\n")
-		Log(ERROR, "dial error %s", err)
+		log.Errorf("dial error %s", err)
 		return
 	}
 
@@ -438,19 +439,19 @@ func (cc *Client) handleHTTPReq(req *http.Request, c net.Conn) {
 		host = fmt.Sprintf("%s:80", host)
 	}
 
-	Log(DEBUG, "request to %s", host)
+	log.Debugf("request to %s", host)
 	c1, err := cc.client.Dial("tcp", host)
 	if err != nil {
 		c.Close()
 		fmt.Fprintf(c, "HTTP/1.1 503 connection failed\r\nConnection: close\r\n\r\n")
-		Log(ERROR, "connection failed %s", err)
+		log.Errorf("connection failed %s", err)
 		return
 	}
 	//defer c1.Close()
 
 	if err = req.Write(c1); err != nil {
 		fmt.Fprintf(c, "HTTP/1.1 503 write to server error\r\nConnection: close\r\n\r\n")
-		Log(ERROR, "write request to server error %s", err)
+		log.Errorf("write request to server error %s", err)
 		c.Close()
 		c1.Close()
 		return

@@ -5,6 +5,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/fangdingjun/go-log"
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 )
@@ -45,16 +46,16 @@ func NewServer(c net.Conn, config *ssh.ServerConfig, conf *Conf) (*Server, error
 // Run waits for server connection finish
 func (sc *Server) Run() {
 	sc.sshConn.Wait()
-	Log(DEBUG, "ssh connection closed")
+	log.Debugf("ssh connection closed")
 	sc.close()
 }
 
 func (sc *Server) close() {
-	Log(DEBUG, "close connection")
+	log.Debugf("close connection")
 	sc.sshConn.Close()
-	//Log(DEBUG, "close listener")
+	//log.Debugf( "close listener")
 	for _, l := range sc.forwardedPorts {
-		Log(DEBUG, "close listener %s", l.Addr())
+		log.Debugf("close listener %s", l.Addr())
 		l.Close()
 	}
 }
@@ -62,7 +63,7 @@ func (sc *Server) close() {
 func (sc *Server) handleNewChannelRequest(ch <-chan ssh.NewChannel) {
 	for newch := range ch {
 
-		Log(DEBUG, "request channel %s", newch.ChannelType())
+		log.Debugf("request channel %s", newch.ChannelType())
 
 		switch newch.ChannelType() {
 		case "session":
@@ -74,7 +75,7 @@ func (sc *Server) handleNewChannelRequest(ch <-chan ssh.NewChannel) {
 			continue
 		}
 
-		Log(DEBUG, "reject channel request %s", newch.ChannelType())
+		log.Debugf("reject channel request %s", newch.ChannelType())
 
 		newch.Reject(ssh.UnknownChannelType, "unknown channel type")
 	}
@@ -83,15 +84,15 @@ func (sc *Server) handleNewChannelRequest(ch <-chan ssh.NewChannel) {
 func (sc *Server) handleGlobalRequest(req <-chan *ssh.Request) {
 	for r := range req {
 
-		Log(DEBUG, "global request %s", r.Type)
+		log.Debugf("global request %s", r.Type)
 
 		switch r.Type {
 		case "tcpip-forward":
-			Log(DEBUG, "request port forward")
+			log.Debugf("request port forward")
 			go sc.handleTcpipForward(r)
 			continue
 		case "cancel-tcpip-forward":
-			Log(DEBUG, "request cancel port forward")
+			log.Debugf("request cancel port forward")
 			go sc.handleCancelTcpipForward(r)
 			continue
 		}
@@ -108,12 +109,12 @@ func serveSFTP(ch ssh.Channel) {
 	server, err := sftp.NewServer(ch)
 
 	if err != nil {
-		Log(DEBUG, "start sftp server failed: %s", err)
+		log.Debugf("start sftp server failed: %s", err)
 		return
 	}
 
 	if err := server.Serve(); err != nil {
-		Log(DEBUG, "sftp server finished with error: %s", err)
+		log.Debugf("sftp server finished with error: %s", err)
 		return
 	}
 }
@@ -132,7 +133,7 @@ type args struct {
 func (sc *Server) handleSession(newch ssh.NewChannel) {
 	ch, req, err := newch.Accept()
 	if err != nil {
-		Log(ERROR, "%s", err.Error())
+		log.Errorf("%s", err.Error())
 		return
 	}
 
@@ -152,7 +153,7 @@ func (sc *Server) handleSession(newch ssh.NewChannel) {
 
 					ret = true
 
-					Log(DEBUG, "handle sftp request")
+					log.Debugf("handle sftp request")
 
 					go serveSFTP(ch)
 				}
@@ -161,7 +162,7 @@ func (sc *Server) handleSession(newch ssh.NewChannel) {
 			ret = false
 		}
 
-		Log(DEBUG, "session request %s, reply %v", r.Type, ret)
+		log.Debugf("session request %s, reply %v", r.Type, ret)
 
 		if r.WantReply {
 			r.Reply(ret, nil)
@@ -176,16 +177,16 @@ func handleDirectTcpip(newch ssh.NewChannel) {
 
 	err := ssh.Unmarshal(data, &r)
 	if err != nil {
-		Log(DEBUG, "invalid ssh parameter")
+		log.Debugf("invalid ssh parameter")
 		newch.Reject(ssh.ConnectionFailed, "invalid argument")
 		return
 	}
 
-	Log(DEBUG, "create connection to %s:%d", r.Raddr, r.Rport)
+	log.Debugf("create connection to %s:%d", r.Raddr, r.Rport)
 
 	rconn, err := dialer.Dial("tcp", net.JoinHostPort(r.Raddr, fmt.Sprintf("%d", r.Rport)))
 	if err != nil {
-		Log(ERROR, "%s", err.Error())
+		log.Errorf("%s", err.Error())
 		newch.Reject(ssh.ConnectionFailed, "invalid argument")
 		return
 	}
@@ -193,7 +194,7 @@ func handleDirectTcpip(newch ssh.NewChannel) {
 	channel, requests, err := newch.Accept()
 	if err != nil {
 		rconn.Close()
-		Log(ERROR, "%s", err.Error())
+		log.Errorf("%s", err.Error())
 		return
 	}
 
@@ -212,7 +213,7 @@ func (sc *Server) handleCancelTcpipForward(req *ssh.Request) {
 	var a tcpipForwardAddr
 
 	if err := ssh.Unmarshal(req.Payload, &a); err != nil {
-		Log(ERROR, "invalid ssh parameter for cancel port forward")
+		log.Errorf("invalid ssh parameter for cancel port forward")
 		if req.WantReply {
 			req.Reply(false, nil)
 		}
@@ -233,7 +234,7 @@ func (sc *Server) handleCancelTcpipForward(req *ssh.Request) {
 func (sc *Server) handleTcpipForward(req *ssh.Request) {
 	var addr tcpipForwardAddr
 	if err := ssh.Unmarshal(req.Payload, &addr); err != nil {
-		Log(ERROR, "parse ssh data error: %s", err)
+		log.Errorf("parse ssh data error: %s", err)
 		if req.WantReply {
 			req.Reply(false, nil)
 		}
@@ -241,7 +242,7 @@ func (sc *Server) handleTcpipForward(req *ssh.Request) {
 	}
 
 	if addr.Port > 65535 || addr.Port < 0 {
-		Log(ERROR, "invalid port %d", addr.Port)
+		log.Errorf("invalid port %d", addr.Port)
 		if req.WantReply {
 			req.Reply(false, nil)
 		}
@@ -250,7 +251,7 @@ func (sc *Server) handleTcpipForward(req *ssh.Request) {
 
 	ip := net.ParseIP(addr.Addr)
 	if ip == nil {
-		Log(ERROR, "invalid ip %d", addr.Port)
+		log.Errorf("invalid ip %d", addr.Port)
 		if req.WantReply {
 			req.Reply(false, nil)
 		}
@@ -261,19 +262,19 @@ func (sc *Server) handleTcpipForward(req *ssh.Request) {
 
 	if _, ok := sc.forwardedPorts[k]; ok {
 		// port in use
-		Log(ERROR, "port in use: %s", k)
+		log.Errorf("port in use: %s", k)
 		if req.WantReply {
 			req.Reply(false, nil)
 		}
 		return
 	}
 
-	//Log(DEBUG, "get request for addr: %s, port: %d", addr.Addr, addr.Port)
+	//log.Debugf( "get request for addr: %s, port: %d", addr.Addr, addr.Port)
 
 	l, err := net.ListenTCP("tcp", &net.TCPAddr{IP: ip, Port: int(addr.Port)})
 	if err != nil {
 		// listen failed
-		Log(ERROR, "%s", err.Error())
+		log.Errorf("%s", err.Error())
 		if req.WantReply {
 			req.Reply(false, nil)
 		}
@@ -281,7 +282,7 @@ func (sc *Server) handleTcpipForward(req *ssh.Request) {
 	}
 
 	a1 := l.Addr()
-	Log(DEBUG, "Listening port %s", a1)
+	log.Debugf("Listening port %s", a1)
 	p := struct {
 		Port uint32
 	}{
@@ -297,10 +298,10 @@ func (sc *Server) handleTcpipForward(req *ssh.Request) {
 	for {
 		c, err := l.Accept()
 		if err != nil {
-			Log(ERROR, "%s", err.Error())
+			log.Errorf("%s", err.Error())
 			return
 		}
-		Log(DEBUG, "accept connection from %s", c.RemoteAddr())
+		log.Debugf("accept connection from %s", c.RemoteAddr())
 		go func(c net.Conn) {
 			laddr := c.LocalAddr()
 			raddr := c.RemoteAddr()
@@ -317,7 +318,7 @@ func (sc *Server) handleTcpipForward(req *ssh.Request) {
 			}
 			ch, r, err := sc.sshConn.OpenChannel("forwarded-tcpip", ssh.Marshal(a2))
 			if err != nil {
-				Log(ERROR, "forward port failed: %s", err.Error())
+				log.Errorf("forward port failed: %s", err.Error())
 				c.Close()
 				return
 			}

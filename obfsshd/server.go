@@ -5,28 +5,55 @@ import (
 	"crypto/tls"
 	"flag"
 	"fmt"
+	"io/ioutil"
+	"net"
+	"os"
+
+	"github.com/fangdingjun/go-log"
+	"github.com/fangdingjun/go-log/formatters"
+	"github.com/fangdingjun/go-log/writers"
 	"github.com/fangdingjun/obfssh"
 	"golang.org/x/crypto/ssh"
-	"io/ioutil"
-	"log"
-	"net"
 )
 
 func main() {
 
 	var configfile string
+	var logfile string
+	var logFileCount int
+	var logFileSize int64
+	var loglevel string
 
 	flag.StringVar(&configfile, "c", "config.yaml", "configure file")
+	flag.StringVar(&logfile, "log_file", "", "log file, default stdout")
+	flag.IntVar(&logFileCount, "log_count", 10, "max count of log to keep")
+	flag.Int64Var(&logFileSize, "log_size", 10, "max log file size MB")
+	flag.StringVar(&loglevel, "log_level", "INFO", "log level, values:\nOFF, FATAL, PANIC, ERROR, WARN, INFO, DEBUG")
+
 	flag.Parse()
+
+	if logfile != "" {
+		log.Default.Out = &writers.FixedSizeFileWriter{
+			MaxCount: logFileCount,
+			Name:     logfile,
+			MaxSize:  logFileSize * 1024 * 1024,
+		}
+	}
+
+	if loglevel != "" {
+		lv, err := log.ParseLevel(loglevel)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		log.Default.Level = lv
+	}
+
+	log.Default.Formatter = &formatters.TextFormatter{TimeFormat: "2006-01-02 15:04:05.000"}
 
 	conf, err := loadConfig(configfile)
 	if err != nil {
 		log.Fatal(err)
-	}
-
-	// set log level
-	if conf.Debug {
-		obfssh.SSHLogLevel = obfssh.DEBUG
 	}
 
 	sconf := &obfssh.Conf{}
@@ -55,10 +82,10 @@ func main() {
 		// auth log
 		AuthLogCallback: func(c ssh.ConnMetadata, method string, err error) {
 			if err != nil {
-				obfssh.Log(obfssh.ERROR, "%s", err.Error())
-				obfssh.Log(obfssh.ERROR, "%s auth failed for %s from %s", method, c.User(), c.RemoteAddr())
+				log.Errorf("%s", err.Error())
+				log.Errorf("%s auth failed for %s from %s", method, c.User(), c.RemoteAddr())
 			} else {
-				obfssh.Log(obfssh.INFO, "Accepted %s for user %s from %s", method, c.User(), c.RemoteAddr())
+				log.Debugf("Accepted %s for user %s from %s", method, c.User(), c.RemoteAddr())
 			}
 		},
 	}
@@ -102,14 +129,14 @@ func main() {
 					return
 				}
 
-				obfssh.Log(obfssh.DEBUG, "accept tcp connection from %s", c.RemoteAddr())
+				log.Debugf("accept tcp connection from %s", c.RemoteAddr())
 
 				go func(c net.Conn) {
 					defer c.Close()
 					sc, err := obfssh.NewServer(c, config, sconf)
 					if err != nil {
 						c.Close()
-						obfssh.Log(obfssh.ERROR, "%s", err.Error())
+						log.Errorf("%s", err.Error())
 						return
 					}
 					sc.Run()

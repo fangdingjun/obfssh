@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net"
 	"os"
 	"path/filepath"
@@ -13,6 +12,9 @@ import (
 	"time"
 
 	"github.com/bgentry/speakeasy"
+	"github.com/fangdingjun/go-log"
+	"github.com/fangdingjun/go-log/formatters"
+	"github.com/fangdingjun/go-log/writers"
 	"github.com/fangdingjun/obfssh"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
@@ -23,6 +25,10 @@ var dialer = &net.Dialer{Timeout: 15 * time.Second}
 func main() {
 	var configfile string
 	var cfg config
+	var logfile string
+	var logFileCount int
+	var logFileSize int64
+	var loglevel string
 
 	flag.StringVar(&configfile, "f", "", "configure file")
 	flag.StringVar(&cfg.Username, "l", os.Getenv("USER"), "ssh username")
@@ -38,8 +44,33 @@ func main() {
 	flag.BoolVar(&cfg.Debug, "d", false, "verbose mode")
 	flag.IntVar(&cfg.KeepaliveInterval, "keepalive_interval", 10, "keep alive interval")
 	flag.IntVar(&cfg.KeepaliveMax, "keepalive_max", 5, "keep alive max")
+	flag.StringVar(&logfile, "log_file", "", "log file, default stdout")
+	flag.IntVar(&logFileCount, "log_count", 10, "max count of log to keep")
+	flag.Int64Var(&logFileSize, "log_size", 10, "max log file size MB")
+	flag.StringVar(&loglevel, "log_level", "INFO", "log level, values:\nOFF, FATAL, PANIC, ERROR, WARN, INFO, DEBUG")
+
 	flag.Usage = usage
+
 	flag.Parse()
+
+	if logfile != "" {
+		log.Default.Out = &writers.FixedSizeFileWriter{
+			MaxCount: logFileCount,
+			Name:     logfile,
+			MaxSize:  logFileSize * 1024 * 1024,
+		}
+	}
+
+	if loglevel != "" {
+		lv, err := log.ParseLevel(loglevel)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		log.Default.Level = lv
+	}
+
+	log.Default.Formatter = &formatters.TextFormatter{TimeFormat: "2006-01-02 15:04:05.000"}
 
 	if configfile != "" {
 		if err := loadConfig(&cfg, configfile); err != nil {
@@ -47,11 +78,7 @@ func main() {
 		}
 	}
 
-	if cfg.Debug {
-		obfssh.SSHLogLevel = obfssh.DEBUG
-	}
-
-	obfssh.Log(obfssh.DEBUG, "obfssh client start")
+	log.Debugf("obfssh client start")
 
 	auth := []ssh.AuthMethod{}
 
@@ -74,7 +101,7 @@ func main() {
 			k1 := filepath.Join(home, f)
 			if pemBytes, err := ioutil.ReadFile(k1); err == nil {
 				if priKey, err := ssh.ParsePrivateKey(pemBytes); err == nil {
-					obfssh.Log(obfssh.DEBUG, "add private key: %s", k1)
+					log.Debugf("add private key: %s", k1)
 					//auth = append(auth, ssh.PublicKeys(priKey))
 					pkeys = append(pkeys, priKey)
 				}
@@ -85,21 +112,21 @@ func main() {
 		agentConn, err = net.Dial("unix", os.Getenv("SSH_AUTH_SOCK"))
 		if err == nil {
 			defer agentConn.Close()
-			obfssh.Log(obfssh.DEBUG, "add auth method with agent %s", os.Getenv("SSH_AUTH_SOCK"))
+			log.Debugf("add auth method with agent %s", os.Getenv("SSH_AUTH_SOCK"))
 			agentClient := agent.NewClient(agentConn)
 			//auth = append(auth, ssh.PublicKeysCallback(agentClient.Signers))
 			signers, err := agentClient.Signers()
 			if err == nil {
 				pkeys = append(pkeys, signers...)
 			} else {
-				obfssh.Log(obfssh.DEBUG, "get key from agent failed: %s", err)
+				log.Debugf("get key from agent failed: %s", err)
 			}
 		} else {
-			obfssh.Log(obfssh.DEBUG, "connect to agent failed")
+			log.Debugf("connect to agent failed")
 		}
 
 		if len(pkeys) != 0 {
-			obfssh.Log(obfssh.DEBUG, "private key length %d", len(pkeys))
+			log.Debugf("private key length %d", len(pkeys))
 			auth = append(auth, ssh.PublicKeys(pkeys...))
 		}
 
@@ -140,15 +167,15 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		obfssh.Log(obfssh.DEBUG, "add private key %s", cfg.PrivateKey)
+		log.Debugf("add private key %s", cfg.PrivateKey)
 		auth = append(auth, ssh.PublicKeys(priKey))
 	}
 
 	if cfg.Password != "" {
-		obfssh.Log(obfssh.DEBUG, "add password auth method")
+		log.Debugf("add password auth method")
 		auth = append(auth, ssh.Password(cfg.Password))
 	} else {
-		obfssh.Log(obfssh.DEBUG, "add keyboard interactive auth")
+		log.Debugf("add keyboard interactive auth")
 		//auth = append(auth,
 		//		ssh.RetryableAuthMethod(ssh.KeyboardInteractive(keyboardAuth), 3))
 		auth = append(auth,
@@ -161,7 +188,7 @@ func main() {
 		Timeout: 10 * time.Second,
 		HostKeyCallback: func(hostname string, remote net.Addr,
 			key ssh.PublicKey) error {
-			obfssh.Log(obfssh.INFO, "%s %s %+v", hostname, remote, key)
+			log.Debugf("%s %s %+v", hostname, remote, key)
 			return nil
 		},
 	}
@@ -175,22 +202,22 @@ func main() {
 	if cfg.Proxy.Scheme != "" && cfg.Proxy.Host != "" && cfg.Proxy.Port != 0 {
 		switch cfg.Proxy.Scheme {
 		case "http":
-			obfssh.Log(obfssh.DEBUG, "use http proxy %s:%d to connect to server",
+			log.Debugf("use http proxy %s:%d to connect to server",
 				cfg.Proxy.Host, cfg.Proxy.Port)
 			c, err = dialHTTPProxy(host, cfg.Port, cfg.Proxy)
 		case "https":
-			obfssh.Log(obfssh.DEBUG, "use https proxy %s:%d to connect to server",
+			log.Debugf("use https proxy %s:%d to connect to server",
 				cfg.Proxy.Host, cfg.Proxy.Port)
 			c, err = dialHTTPSProxy(host, cfg.Port, cfg.Proxy)
 		case "socks5":
-			obfssh.Log(obfssh.DEBUG, "use socks proxy %s:%d to connect to server",
+			log.Debugf("use socks proxy %s:%d to connect to server",
 				cfg.Proxy.Host, cfg.Proxy.Port)
 			c, err = dialSocks5Proxy(host, cfg.Port, cfg.Proxy)
 		default:
 			err = fmt.Errorf("unsupported scheme: %s", cfg.Proxy.Scheme)
 		}
 	} else {
-		obfssh.Log(obfssh.DEBUG, "dail to %s", rhost)
+		log.Debugf("dail to %s", rhost)
 		c, err = dialer.Dial("tcp", rhost)
 	}
 
@@ -198,7 +225,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	obfssh.Log(obfssh.DEBUG, "dail success")
+	log.Debugf("dail success")
 
 	timeout := time.Duration(cfg.KeepaliveInterval*2) * time.Second
 
@@ -207,7 +234,7 @@ func main() {
 	conn := &obfssh.TimedOutConn{Conn: c, Timeout: timeout}
 
 	if cfg.TLS {
-		obfssh.Log(obfssh.DEBUG, "begin tls handshake")
+		log.Debugf("begin tls handshake")
 		_conn = tls.Client(conn, &tls.Config{
 			ServerName:         host,
 			InsecureSkipVerify: cfg.TLSInsecure,
@@ -215,7 +242,7 @@ func main() {
 		if err := _conn.(*tls.Conn).Handshake(); err != nil {
 			log.Fatal(err)
 		}
-		obfssh.Log(obfssh.DEBUG, "tls handshake done")
+		log.Debugf("tls handshake done")
 	}
 
 	conf := &obfssh.Conf{
@@ -224,13 +251,13 @@ func main() {
 		KeepAliveMax:      cfg.KeepaliveMax,
 	}
 
-	obfssh.Log(obfssh.DEBUG, "ssh negotation")
+	log.Debugf("ssh negotation")
 	client, err := obfssh.NewClient(_conn, config, rhost, conf)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	obfssh.Log(obfssh.DEBUG, "ssh negotation success")
+	log.Debugf("ssh negotation success")
 
 	var local, remote string
 
@@ -239,7 +266,7 @@ func main() {
 	for _, p := range cfg.LocalForwards {
 		addr := parseForwardAddr(p)
 		if len(addr) != 4 && len(addr) != 3 {
-			log.Printf("wrong forward addr %s, format: [local_host:]local_port:remote_host:remote_port", p)
+			log.Errorf("wrong forward addr %s, format: [local_host:]local_port:remote_host:remote_port", p)
 			continue
 		}
 		if len(addr) == 4 {
@@ -251,14 +278,14 @@ func main() {
 		}
 		//log.Printf("add local to remote %s->%s", local, remote)
 		if err := client.AddLocalForward(local, remote); err != nil {
-			log.Println(err)
+			log.Errorln(err)
 		}
 	}
 
 	for _, p := range cfg.RemoteForwards {
 		addr := parseForwardAddr(p)
 		if len(addr) != 4 && len(addr) != 3 {
-			log.Printf("wrong forward addr %s, format: [local_host:]local_port:remote_host:remote_port", p)
+			log.Errorf("wrong forward addr %s, format: [local_host:]local_port:remote_host:remote_port", p)
 			continue
 		}
 		if len(addr) == 4 {
@@ -270,7 +297,7 @@ func main() {
 		}
 		//log.Printf("add remote to local %s->%s", remote, local)
 		if err := client.AddRemoteForward(local, remote); err != nil {
-			log.Println(err)
+			log.Errorln(err)
 		}
 	}
 	for _, p := range cfg.DynamicForwards {
@@ -282,7 +309,7 @@ func main() {
 		}
 		//log.Printf("listen on %s", local)
 		if err := client.AddDynamicForward(local); err != nil {
-			log.Println(err)
+			log.Errorln(err)
 		}
 	}
 
@@ -294,7 +321,7 @@ func main() {
 		}
 		//log.Printf("listen on %s", local)
 		if err := client.AddDynamicHTTPForward(local); err != nil {
-			log.Println(err)
+			log.Errorln(err)
 		}
 
 	}
@@ -304,7 +331,7 @@ func main() {
 	if !cfg.NotRunCmd {
 		if cmd != "" {
 			if d, err := client.RunCmd(cmd); err != nil {
-				log.Println(err)
+				log.Errorln(err)
 				hasErr = true
 			} else {
 				//log.Printf("%s", string(d))
@@ -313,17 +340,17 @@ func main() {
 		} else {
 			if err := client.Shell(); err != nil {
 				hasErr = true
-				log.Println(err)
+				log.Errorln(err)
 			}
 		}
 	}
 
 	if err := client.Run(); err != nil {
-		log.Println(err)
+		log.Errorln(err)
 		hasErr = true
 	}
 
-	obfssh.Log(obfssh.DEBUG, "obfssh client exit")
+	log.Debugf("obfssh client exit")
 	if hasErr {
 		os.Exit(1)
 	}
@@ -428,6 +455,19 @@ Options:
 
     -tls-insecure
        do not verify server's tls ceritificate
+       
+    -log_file
+       log file, default stdout
+    
+    -log_count
+      max count of log file to keep, default 10
+
+    -log_size
+       max log size MB, default 10
+
+    -log_level
+       log level, values:
+          OFF, FATAL, PANIC, ERROR, WARN, INFO, DEBUG
 `
 	fmt.Printf("%s", usageStr)
 	os.Exit(1)

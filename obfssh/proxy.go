@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fangdingjun/obfssh"
+	"github.com/fangdingjun/go-log"
 	socks "github.com/fangdingjun/socks-go"
 )
 
@@ -58,7 +58,7 @@ var _ net.Conn = &httpProxyConn{}
 
 func updateProxyFromEnv(cfg *config) {
 	if cfg.Proxy.Scheme != "" && cfg.Proxy.Host != "" && cfg.Proxy.Port != 0 {
-		obfssh.Log(obfssh.DEBUG, "proxy already specified by config, not parse environment proxy")
+		log.Debugf("proxy already specified by config, not parse environment proxy")
 		return
 	}
 
@@ -81,7 +81,7 @@ func updateProxyFromEnv(cfg *config) {
 
 	u, err := url.Parse(proxyStr)
 	if err != nil {
-		obfssh.Log(obfssh.DEBUG, "parse proxy from environment failed: %s", err)
+		log.Debugf("parse proxy from environment failed: %s", err)
 		return
 	}
 

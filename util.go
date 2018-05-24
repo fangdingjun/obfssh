@@ -5,19 +5,6 @@ import (
 	"log"
 )
 
-const (
-	_ = iota
-	// DEBUG  log level debug
-	DEBUG
-	// INFO log level info
-	INFO
-	// ERROR log level error
-	ERROR
-)
-
-// SSHLogLevel global value for log level
-var SSHLogLevel = ERROR
-
 // PipeAndClose pipe the data between c and s, close both when done
 func PipeAndClose(c io.ReadWriteCloser, s io.ReadWriteCloser) {
 	defer func() {
@@ -40,11 +27,4 @@ func PipeAndClose(c io.ReadWriteCloser, s io.ReadWriteCloser) {
 	}()
 
 	<-cc
-}
-
-// Log log the message by level
-func Log(level int, s string, args ...interface{}) {
-	if level >= SSHLogLevel {
-		log.Printf(s, args...)
-	}
 }

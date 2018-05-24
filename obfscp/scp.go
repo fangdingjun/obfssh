@@ -5,41 +5,46 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/bgentry/speakeasy"
-	"github.com/fangdingjun/obfssh"
-	"github.com/kr/fs"
-	"github.com/pkg/sftp"
-	"golang.org/x/crypto/ssh"
-	"golang.org/x/crypto/ssh/agent"
 	"io"
 	"io/ioutil"
-	"log"
 	"net"
 	"os"
 	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/bgentry/speakeasy"
+	"github.com/fangdingjun/go-log"
+	"github.com/fangdingjun/go-log/formatters"
+	"github.com/fangdingjun/go-log/writers"
+	"github.com/fangdingjun/obfssh"
+	"github.com/kr/fs"
+	"github.com/pkg/sftp"
+	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/agent"
 )
 
 type options struct {
-	Debug                     bool
-	Port                      int
-	User                      string
-	Passwd                    string
-	TLS                       bool
-	TLSInsecure               bool
-	Recursive                 bool
-	ObfsMethod                string
-	ObfsKey                   string
-	DisableObfsAfterHandshake bool
-	PrivateKey                string
+	Debug       bool
+	Port        int
+	User        string
+	Passwd      string
+	TLS         bool
+	TLSInsecure bool
+	Recursive   bool
+	PrivateKey  string
 }
 
 var dialer = &net.Dialer{Timeout: 10 * time.Second}
 
 func main() {
 	var cfg options
+	var logfile string
+	var logFileCount int
+	var logFileSize int64
+	var loglevel string
+
 	flag.Usage = usage
 
 	flag.BoolVar(&cfg.Debug, "d", false, "verbose mode")
@@ -50,11 +55,11 @@ func main() {
 	flag.StringVar(&cfg.Passwd, "pw", "", "password")
 	flag.StringVar(&cfg.PrivateKey, "i", "", "private key")
 	flag.BoolVar(&cfg.Recursive, "r", false, "recursively copy entries")
+	flag.StringVar(&logfile, "log_file", "", "log file, default stdout")
+	flag.IntVar(&logFileCount, "log_count", 10, "max count of log to keep")
+	flag.Int64Var(&logFileSize, "log_size", 10, "max log file size MB")
+	flag.StringVar(&loglevel, "log_level", "INFO", "log level, values:\nOFF, FATAL, PANIC, ERROR, WARN, INFO, DEBUG")
 	flag.Parse()
-
-	if cfg.Debug {
-		obfssh.SSHLogLevel = obfssh.DEBUG
-	}
 
 	args := flag.Args()
 
@@ -62,6 +67,24 @@ func main() {
 		flag.Usage()
 		os.Exit(1)
 	}
+	if logfile != "" {
+		log.Default.Out = &writers.FixedSizeFileWriter{
+			MaxCount: logFileCount,
+			Name:     logfile,
+			MaxSize:  logFileSize * 1024 * 1024,
+		}
+	}
+
+	if loglevel != "" {
+		lv, err := log.ParseLevel(loglevel)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		log.Default.Level = lv
+	}
+
+	log.Default.Formatter = &formatters.TextFormatter{TimeFormat: "2006-01-02 15:04:05.000"}
 
 	var err error
 
@@ -85,13 +108,13 @@ func createSFTPConn(host, user string, cfg *options) (*sftp.Client, error) {
 		if aconn, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK")); err == nil {
 			//auths = append(auths, ssh.PublicKeysCallback(agent.NewClient(aconn).Signers))
 			if signers, err := agent.NewClient(aconn).Signers(); err == nil {
-				debuglog("add private key from agent")
+				log.Debugf("add private key from agent")
 				pkeys = append(pkeys, signers...)
 			} else {
-				debuglog("get key from agent failed: %s", err)
+				log.Debugf("get key from agent failed: %s", err)
 			}
 		} else {
-			debuglog("dial to agent failed: %s", err)
+			log.Debugf("dial to agent failed: %s", err)
 		}
 
 		home := os.Getenv("HOME")
@@ -107,25 +130,25 @@ func createSFTPConn(host, user string, cfg *options) (*sftp.Client, error) {
 				if priKey, err := ssh.ParsePrivateKey(pemBytes); err == nil {
 					//auths = append(auths, ssh.PublicKeys(priKey))
 					pkeys = append(pkeys, priKey)
-					debuglog("add private key %s", k1)
+					log.Debugf("add private key %s", k1)
 				} else {
-					debuglog("parse private key failed: %s", err)
+					log.Debugf("parse private key failed: %s", err)
 				}
 			}
 
 		}
 
 		if len(pkeys) != 0 {
-			debuglog("totol %d private keys", len(pkeys))
+			log.Debugf("totol %d private keys", len(pkeys))
 			auths = append(auths, ssh.PublicKeys(pkeys...))
 		}
 	}
 
 	if cfg.Passwd != "" {
-		debuglog("add password auth")
+		log.Debugf("add password auth")
 		auths = append(auths, ssh.Password(cfg.Passwd))
 	} else {
-		debuglog("add keyboard interactive")
+		log.Debugf("add keyboard interactive")
 		auths = append(auths,
 			ssh.RetryableAuthMethod(ssh.PasswordCallback(passwordAuth), 3))
 	}
@@ -133,13 +156,13 @@ func createSFTPConn(host, user string, cfg *options) (*sftp.Client, error) {
 	if cfg.PrivateKey != "" {
 		if buf, err := ioutil.ReadFile(cfg.PrivateKey); err == nil {
 			if p, err := ssh.ParsePrivateKey(buf); err == nil {
-				debuglog("add private key: %s", cfg.PrivateKey)
+				log.Debugf("add private key: %s", cfg.PrivateKey)
 				auths = append(auths, ssh.PublicKeys(p))
 			} else {
-				debuglog("parse private key failed: %s", err)
+				log.Debugf("parse private key failed: %s", err)
 			}
 		} else {
-			debuglog("read private key failed: %s", err)
+			log.Debugf("read private key failed: %s", err)
 		}
 	}
 	if user == "" {
@@ -250,18 +273,18 @@ func download(args []string, cfg *options) error {
 		st1, err := sftpConn.Stat(path)
 		if err != nil {
 			err1 = err
-			debuglog("%s", err)
+			log.Debugf("%s", err)
 			sftpConn.Close()
 			continue
 		}
 		if st1.Mode().IsDir() {
 			if !cfg.Recursive {
-				debuglog("omit remote directory %s", path)
+				log.Debugf("omit remote directory %s", path)
 				sftpConn.Close()
 				continue
 			}
 			if err := rget(sftpConn, path, localFile); err != nil {
-				debuglog("download error: %s", err)
+				log.Debugf("download error: %s", err)
 				err1 = err
 			}
 			sftpConn.Close()
@@ -276,14 +299,14 @@ func download(args []string, cfg *options) error {
 		lfile = clean(lfile)
 
 		if err := get(sftpConn, path, lfile); err != nil {
-			debuglog("download error: %s", err)
+			log.Debugf("download error: %s", err)
 			err1 = err
 		}
 
 		sftpConn.Close()
 	}
 
-	debuglog("done")
+	log.Debugf("done")
 	return err1
 }
 
@@ -332,7 +355,7 @@ func upload(args []string, cfg *options) error {
 
 		// local file not exists
 		if err != nil {
-			debuglog("%s", err)
+			log.Debugf("%s", err)
 			err1 = err
 			continue
 		}
@@ -340,12 +363,12 @@ func upload(args []string, cfg *options) error {
 		// directory
 		if st1.Mode().IsDir() {
 			if !cfg.Recursive {
-				debuglog("omit directory %s", localFile)
+				log.Debugf("omit directory %s", localFile)
 				continue
 			}
 			// transfer directory
 			if err := rput(sftpConn, localFile, path); err != nil {
-				debuglog("%s", err)
+				log.Debugf("%s", err)
 				err1 = err
 			}
 
@@ -364,7 +387,7 @@ func upload(args []string, cfg *options) error {
 		remoteFile = clean(remoteFile)
 
 		if err := put(sftpConn, localFile, remoteFile); err != nil {
-			debuglog("upload %s failed: %s", localFile, err.Error())
+			log.Debugf("upload %s failed: %s", localFile, err.Error())
 			err1 = err
 		}
 	}
@@ -373,7 +396,7 @@ func upload(args []string, cfg *options) error {
 
 func get(sftpConn *sftp.Client, remoteFile, localFile string) error {
 
-	debuglog("download %s -> %s", remoteFile, localFile)
+	log.Debugf("download %s -> %s", remoteFile, localFile)
 
 	fp, err := sftpConn.Open(remoteFile)
 	if err != nil {
@@ -410,13 +433,13 @@ func get(sftpConn *sftp.Client, remoteFile, localFile string) error {
 		return err
 	}
 
-	debuglog("done")
+	log.Debugf("done")
 
 	return nil
 }
 
 func put(sftpConn *sftp.Client, localFile, remoteFile string) error {
-	debuglog("upload %s -> %s", localFile, remoteFile)
+	log.Debugf("upload %s -> %s", localFile, remoteFile)
 
 	fpw, err := sftpConn.OpenFile(remoteFile, syscall.O_WRONLY|syscall.O_CREAT|syscall.O_TRUNC)
 	if err != nil {
@@ -452,7 +475,7 @@ func put(sftpConn *sftp.Client, localFile, remoteFile string) error {
 		return err
 	}
 
-	debuglog("done")
+	log.Debugf("done")
 
 	return nil
 }
@@ -466,7 +489,7 @@ func rput(sftpConn *sftp.Client, localDir, remoteDir string) error {
 		}
 
 		if st := walker.Stat(); !st.Mode().IsRegular() {
-			debuglog("skip %s", walker.Path())
+			log.Debugf("skip %s", walker.Path())
 			continue
 		}
 
@@ -490,7 +513,7 @@ func rput(sftpConn *sftp.Client, localDir, remoteDir string) error {
 }
 
 func rget(sftpConn *sftp.Client, remoteDir, localDir string) error {
-	debuglog("transfer recusive from remote to local, %s -> %s", remoteDir, localDir)
+	log.Debugf("transfer recusive from remote to local, %s -> %s", remoteDir, localDir)
 
 	walker := sftpConn.Walk(remoteDir)
 	for walker.Step() {
@@ -499,7 +522,7 @@ func rget(sftpConn *sftp.Client, remoteDir, localDir string) error {
 		}
 
 		if st := walker.Stat(); !st.Mode().IsRegular() {
-			debuglog("skip %s", walker.Path())
+			log.Debugf("skip %s", walker.Path())
 			continue
 		}
 
@@ -539,13 +562,13 @@ type dirInterface interface {
 func makeDirs(p string, c dirInterface) error {
 	p = clean(p)
 
-	debuglog("make directory for %s", p)
+	log.Debugf("make directory for %s", p)
 
 	for i := 1; i < len(p); i++ {
 		if p[i] == '/' {
 			p1 := p[:i]
 			if _, err := c.Stat(p1); err != nil {
-				debuglog("make directory %s", p1)
+				log.Debugf("make directory %s", p1)
 				if err := c.Mkdir(p1); err != nil {
 					return err
 				}
@@ -559,10 +582,6 @@ func passwordAuth() (string, error) {
 	// read password from console
 	s, err := speakeasy.Ask("Password: ")
 	return strings.Trim(s, " \r\n"), err
-}
-
-func debuglog(format string, args ...interface{}) {
-	obfssh.Log(obfssh.DEBUG, format, args...)
 }
 
 //
@@ -618,7 +637,20 @@ Options:
       connect to server via TLS
 
     -tls-insecure
-      do not verify server's certificate
+	  do not verify server's certificate
+
+    -log_file
+      log file, default stdout
+   
+    -log_count
+     max count of log file to keep, default 10
+
+    -log_size
+      max log size MB, default 10
+
+    -log_level
+      log level, values:
+         OFF, FATAL, PANIC, ERROR, WARN, INFO, DEBUG
 `
 	fmt.Printf("%s", usageStr)
 	os.Exit(1)
