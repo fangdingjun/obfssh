@@ -298,7 +298,7 @@ func (sc *Server) handleTcpipForward(req *ssh.Request) {
 	for {
 		c, err := l.Accept()
 		if err != nil {
-			log.Errorf("%s", err.Error())
+			log.Debugf("%s", err.Error())
 			return
 		}
 		log.Debugf("accept connection from %s", c.RemoteAddr())

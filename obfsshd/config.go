@@ -2,10 +2,11 @@ package main
 
 import (
 	"bytes"
+	"io/ioutil"
+
+	"github.com/fangdingjun/go-log"
 	"github.com/go-yaml/yaml"
 	"golang.org/x/crypto/ssh"
-	"io/ioutil"
-	"log"
 )
 
 type listen struct {
@@ -51,7 +52,7 @@ func loadConfig(f string) (*serverConfig, error) {
 	for i := range c.Users {
 		buf1, err := ioutil.ReadFile(c.Users[i].AuthorizedKeyFile)
 		if err != nil {
-			log.Printf("read publickey for %s failed, ignore", c.Users[i].Username)
+			log.Warnf("read publickey for %s failed, ignore", c.Users[i].Username)
 			continue
 		}
 
