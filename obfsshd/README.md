@@ -24,6 +24,6 @@ run client
 
     go get github.com/fangdingjun/obfssh/obfssh
 
-    $GOPATH/bin/obfssh_client -N -D :1234 -p 2022 -l user2 -pw user2 localhost
+    $GOPATH/bin/obfssh -N -D :1234 -p 2022 -l user2 -pw user2 localhost
 
     this will create a socks proxy on :1234

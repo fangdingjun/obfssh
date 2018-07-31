@@ -19,7 +19,7 @@ server usage example
 
     var l net.Listener
     var err error
-    if useTLS{
+    if useTLS {
         cert, err := tls.LoadX509KeyPair(certFile, keyFile)
         l, err = tls.Listen("tcp", ":2022", &tls.Config{
             Certificates: []tls.Certificate{cert},
@@ -57,7 +57,7 @@ client usage example
     
     var c net.Conn
     var err error 
-    if useTLS{
+    if useTLS {
         c, err = tls.Dial("tcp", addr, &tls.Config{
             ServerName: "localhost",
             InsecureSkipVerify: true,
