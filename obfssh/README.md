@@ -1,4 +1,4 @@
-obfssh\_client
+obfssh
 =============
 
 this is obfssh example

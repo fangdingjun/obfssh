@@ -1,4 +1,4 @@
-obfssh\_scp
+obfscp
 =========
 
 obfscp is a scp style sftp client by golang, support connect to server via TLS
