@@ -210,7 +210,7 @@ func createSFTPConn(host, user string, cfg *options) (*sftp.Client, error) {
 
 	//defer conn.Close()
 
-	sftpConn, err := sftp.NewClient(conn.Client(), sftp.MaxPacket(64*1024))
+	sftpConn, err := sftp.NewClient(conn.Client(), sftp.MaxPacket(32*1024))
 	if err != nil {
 		//log.Fatal(err)
 		return nil, err
@@ -326,6 +326,7 @@ func upload(args []string, cfg *options) error {
 
 	sftpConn, err := createSFTPConn(host, user, cfg)
 	if err != nil {
+		log.Debugf("create sftp failed: %s", err)
 		return err
 	}
 	defer sftpConn.Close()
@@ -591,7 +592,7 @@ func passwordAuth() (string, error) {
 // use this function has no problem
 //
 func copyFile(w io.Writer, r io.Reader) error {
-	buf := make([]byte, 34*1024)
+	buf := make([]byte, 32*1024)
 	for {
 		n, err := r.Read(buf)
 		if n > 0 {
