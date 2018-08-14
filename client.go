@@ -165,27 +165,27 @@ func (cc *Client) Shell() error {
 
 	// this make CTRL+C works
 	log.Debugf("turn terminal mode to raw")
+
 	oldState, _ := terminal.MakeRaw(0)
+	defer func() {
+		log.Debugf("restore terminal mode")
+		terminal.Restore(0, oldState)
+	}()
+
 	w, h, _ := terminal.GetSize(0)
 	log.Debugf("request pty")
 	if err := session.RequestPty("xterm", h, w, modes); err != nil {
 		log.Errorf("request pty error: %s", err.Error())
-		log.Debugf("restore terminal mode")
-		terminal.Restore(0, oldState)
 		return err
 	}
 	log.Debugf("request shell")
 	if err := session.Shell(); err != nil {
 		log.Errorf("start shell error: %s", err.Error())
-		log.Debugf("restore terminal mode")
-		terminal.Restore(0, oldState)
 		return err
 	}
 
 	session.Wait()
 	log.Debugf("session closed")
-	terminal.Restore(0, oldState)
-	log.Debugf("restore terminal mode")
 	return nil
 }
 
