@@ -44,6 +44,7 @@ func main() {
 	flag.BoolVar(&cfg.Debug, "d", false, "verbose mode")
 	flag.IntVar(&cfg.KeepaliveInterval, "keepalive_interval", 10, "keep alive interval")
 	flag.IntVar(&cfg.KeepaliveMax, "keepalive_max", 5, "keep alive max")
+	flag.Var(&cfg.DynamicHTTP, "http", "listen for http port")
 	flag.StringVar(&logfile, "log_file", "", "log file, default stdout")
 	flag.IntVar(&logFileCount, "log_count", 10, "max count of log to keep")
 	flag.Int64Var(&logFileSize, "log_size", 10, "max log file size MB")
@@ -59,6 +60,10 @@ func main() {
 			Name:     logfile,
 			MaxSize:  logFileSize * 1024 * 1024,
 		}
+	}
+
+	if cfg.Debug {
+		loglevel = "DEBUG"
 	}
 
 	if loglevel != "" {
@@ -391,10 +396,13 @@ func passwordAuth() (string, error) {
 
 func usage() {
 	usageStr := `Usage:
-  obfss_client -N -d -D [bind_address:]port -f configfile
+  obfssh -N -d -D [bind_address:]port -f configfile
+   -tls -tls-insecure -log_file /path/to/file
+   -log_count 10 -log_size 10
+   -log_level INFO
    -i identity_file -L [bind_address:]port:host:hostport
-   -l login_name -pw password -p port -obfs_method method
-   -obfs_key key -disable_obfs_after_handshake 
+   -l login_name -pw password -p port 
+   -http [bind_addr:]port
    -R [bind_address:]port:host:hostport [user@]hostname [command]
 
 Options:
@@ -449,7 +457,13 @@ Options:
       Specifies the max error count for keep alive,
       when the count reach the max, the connection will
       be abort.
-	
+
+    -http [bind_addr:]port
+       listen a port and act as http proxy server, 
+       but connect to target server through
+       encrypt ssh connection
+       similar like -D, but input is http, not socks5
+
     -tls
        connect to server via TLS
 
