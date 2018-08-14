@@ -114,13 +114,16 @@ func serveSFTP(ch ssh.Channel) {
 
 	if err != nil {
 		log.Debugf("start sftp server failed: %s", err)
+		ch.SendRequest("exit-status", false, ssh.Marshal(exitStatus{Status: 127}))
 		return
 	}
 
 	if err := server.Serve(); err != nil {
 		log.Debugf("sftp server finished with error: %s", err)
+		ch.SendRequest("exit-status", false, ssh.Marshal(exitStatus{Status: 127}))
 		return
 	}
+	ch.SendRequest("exit-status", false, ssh.Marshal(exitStatus{Status: 0}))
 }
 
 type directTcpipMsg struct {
