@@ -2,14 +2,15 @@ package obfssh
 
 import (
 	"io"
-	"log"
+
+	"github.com/fangdingjun/go-log"
 )
 
 // PipeAndClose pipe the data between c and s, close both when done
 func PipeAndClose(c io.ReadWriteCloser, s io.ReadWriteCloser) {
 	defer func() {
 		if err := recover(); err != nil {
-			log.Printf("recovered: %+v", err)
+			log.Errorf("recovered: %+v", err)
 		}
 	}()
 	defer c.Close()
