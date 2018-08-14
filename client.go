@@ -418,9 +418,9 @@ func (cc *Client) handleConnect(req *http.Request, c net.Conn) {
 
 	c1, err := cc.client.Dial("tcp", req.RequestURI)
 	if err != nil {
-		c.Close()
 		fmt.Fprintf(c, "HTTP/1.0 503 connection failed\r\n\r\n")
 		log.Errorf("dial error %s", err)
+		c.Close()
 		return
 	}
 
@@ -439,9 +439,9 @@ func (cc *Client) handleHTTPReq(req *http.Request, c net.Conn) {
 	log.Debugf("request to %s", host)
 	c1, err := cc.client.Dial("tcp", host)
 	if err != nil {
-		c.Close()
 		fmt.Fprintf(c, "HTTP/1.1 503 connection failed\r\nConnection: close\r\n\r\n")
 		log.Errorf("connection failed %s", err)
+		c.Close()
 		return
 	}
 	//defer c1.Close()
