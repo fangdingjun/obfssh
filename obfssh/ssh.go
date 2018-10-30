@@ -13,8 +13,6 @@ import (
 
 	"github.com/bgentry/speakeasy"
 	"github.com/fangdingjun/go-log"
-	"github.com/fangdingjun/go-log/formatters"
-	"github.com/fangdingjun/go-log/writers"
 	"github.com/fangdingjun/obfssh"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
@@ -55,7 +53,7 @@ func main() {
 	flag.Parse()
 
 	if logfile != "" {
-		log.Default.Out = &writers.FixedSizeFileWriter{
+		log.Default.Out = &log.FixedSizeFileWriter{
 			MaxCount: logFileCount,
 			Name:     logfile,
 			MaxSize:  logFileSize * 1024 * 1024,
@@ -74,8 +72,6 @@ func main() {
 		}
 		log.Default.Level = lv
 	}
-
-	log.Default.Formatter = &formatters.TextFormatter{TimeFormat: "2006-01-02 15:04:05.000"}
 
 	if configfile != "" {
 		if err := loadConfig(&cfg, configfile); err != nil {
