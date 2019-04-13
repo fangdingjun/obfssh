@@ -14,6 +14,7 @@ import (
 
 	"github.com/fangdingjun/go-log"
 	"github.com/fangdingjun/obfssh"
+	"github.com/fangdingjun/protolistener"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -95,7 +96,9 @@ func main() {
 		AuthLogCallback: func(c ssh.ConnMetadata, method string, err error) {
 			if err != nil {
 				log.Debugf("%s", err.Error())
-				log.Errorf("%s auth failed for %s from %s", method, c.User(), c.RemoteAddr())
+				if method != "none" {
+					log.Errorf("%s auth failed for %s from %s", method, c.User(), c.RemoteAddr())
+				}
 			} else {
 				log.Printf("Accepted %s for user %s from %s", method, c.User(), c.RemoteAddr())
 			}
@@ -124,12 +127,14 @@ func main() {
 			}
 			defer l.Close()
 
+			l = protolistener.New(l)
+
 			if lst.Key != "" && lst.Cert != "" {
 				cert, err := tls.LoadX509KeyPair(lst.Cert, lst.Key)
 				if err != nil {
 					log.Fatal(err)
 				}
-				l = tls.NewListener(&protoListener{l}, &tls.Config{
+				l = tls.NewListener(l, &tls.Config{
 					Certificates: []tls.Certificate{cert},
 				})
 			}

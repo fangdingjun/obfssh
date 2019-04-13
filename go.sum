@@ -4,6 +4,8 @@ github.com/davecgh/go-spew v1.1.0 h1:ZDRjVQ15GmhC3fiQ8ni8+OwkZQO4DARzQgrnXU1Liz8
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/fangdingjun/go-log v4.0.0+incompatible h1:h/3S0FRNiFR1A5xkK/ECHtmc2O/DVESKCzjhpgzszfA=
 github.com/fangdingjun/go-log v4.0.0+incompatible/go.mod h1:Y6ko/KySCpIcAX3mrfiUJtuPY2saPwofv9WYcUatPJY=
+github.com/fangdingjun/protolistener v0.0.0-20190413090244-355464816fc0 h1:dafx8KP2yvsX8oAFwJ6Bx54h3YE2P7UXLB453z7LbPo=
+github.com/fangdingjun/protolistener v0.0.0-20190413090244-355464816fc0/go.mod h1:bp6oYi3nsUwqGyzikoHJ672i9vX39Qp1h1C/r/vkIIg=
 github.com/fangdingjun/socks-go v0.0.0-20180926100003-fc6f0a9ee1f4 h1:c3Iw/znf2xe2uut9zUTueO6XHyTTLugrbN9fAE4NAkg=
 github.com/fangdingjun/socks-go v0.0.0-20180926100003-fc6f0a9ee1f4/go.mod h1:0P4kTlyyh76uY1Li3cyw4pOIKGL9RmXXWTQYFLS1ZaM=
 github.com/go-yaml/yaml v2.1.0+incompatible h1:RYi2hDdss1u4YE7GwixGzWwVo47T8UQwnTLB6vQiq+o=
