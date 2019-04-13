@@ -9,6 +9,8 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/fangdingjun/go-log"
 	"github.com/fangdingjun/obfssh"
@@ -154,6 +156,12 @@ func main() {
 			}
 		}(lst)
 	}
-	select {}
+
+	ch := make(chan os.Signal, 2)
+	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
+	select {
+	case s := <-ch:
+		log.Printf("received signal %s, exit.", s)
+	}
 
 }
