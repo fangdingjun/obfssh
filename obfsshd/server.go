@@ -115,22 +115,22 @@ func main() {
 		go func(lst listen) {
 			var l net.Listener
 			var err error
-			if lst.Key == "" || lst.Cert == "" {
-				l, err = net.Listen("tcp", fmt.Sprintf(":%d", lst.Port))
-			} else {
-				cert, err := tls.LoadX509KeyPair(lst.Cert, lst.Key)
-				if err != nil {
-					log.Fatal(err)
-				}
-				l, err = tls.Listen("tcp", fmt.Sprintf(":%d", lst.Port), &tls.Config{
-					Certificates: []tls.Certificate{cert},
-				})
-			}
 
+			l, err = net.Listen("tcp", fmt.Sprintf(":%d", lst.Port))
 			if err != nil {
 				log.Fatal(err)
 			}
 			defer l.Close()
+
+			if lst.Key != "" && lst.Cert != "" {
+				cert, err := tls.LoadX509KeyPair(lst.Cert, lst.Key)
+				if err != nil {
+					log.Fatal(err)
+				}
+				l = tls.NewListener(&protoListener{l}, &tls.Config{
+					Certificates: []tls.Certificate{cert},
+				})
+			}
 
 			for {
 				c, err := l.Accept()
