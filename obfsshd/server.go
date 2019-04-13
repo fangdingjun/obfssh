@@ -95,9 +95,9 @@ func main() {
 		AuthLogCallback: func(c ssh.ConnMetadata, method string, err error) {
 			if err != nil {
 				log.Debugf("%s", err.Error())
-				log.Debugf("%s auth failed for %s from %s", method, c.User(), c.RemoteAddr())
+				log.Errorf("%s auth failed for %s from %s", method, c.User(), c.RemoteAddr())
 			} else {
-				log.Debugf("Accepted %s for user %s from %s", method, c.User(), c.RemoteAddr())
+				log.Printf("Accepted %s for user %s from %s", method, c.User(), c.RemoteAddr())
 			}
 		},
 	}
@@ -141,7 +141,7 @@ func main() {
 					return
 				}
 
-				log.Debugf("accept tcp connection from %s", c.RemoteAddr())
+				log.Infof("accept tcp connection from %s", c.RemoteAddr())
 
 				go func(c net.Conn) {
 					defer c.Close()

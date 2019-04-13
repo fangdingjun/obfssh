@@ -79,7 +79,7 @@ func (sc *Server) handleNewChannelRequest(ch <-chan ssh.NewChannel) {
 			continue
 		}
 
-		log.Debugf("reject channel request %s", newch.ChannelType())
+		log.Errorf("reject channel request %s", newch.ChannelType())
 
 		newch.Reject(ssh.UnknownChannelType, "unknown channel type")
 	}
@@ -189,7 +189,7 @@ func (sc *Server) handleSession(newch ssh.NewChannel) {
 		case "exec":
 			ret = true
 			if err = ssh.Unmarshal(r.Payload, &_cmd); err == nil {
-				log.Debugln("execute command", _cmd.Arg)
+				log.Infoln("execute command", _cmd.Arg)
 				if runtime.GOOS == "windows" {
 					cmd = exec.Command("powershell", "-Command", _cmd.Arg)
 				} else {
@@ -234,7 +234,7 @@ func handleShell(cmd *exec.Cmd, ch ssh.Channel) {
 	var _pty io.ReadWriteCloser
 	var err error
 
-	log.Debugln("start shell")
+	log.Infoln("start shell")
 
 	//_pty, err = pty.Start(cmd)
 	if runtime.GOOS == "unix" || runtime.GOOS == "linux" {
@@ -321,7 +321,7 @@ func handleDirectTcpip(newch ssh.NewChannel) {
 
 	err := ssh.Unmarshal(data, &r)
 	if err != nil {
-		log.Debugf("invalid ssh parameter")
+		log.Errorln("invalid ssh parameter")
 		newch.Reject(ssh.ConnectionFailed, "invalid argument")
 		return
 	}
@@ -426,7 +426,7 @@ func (sc *Server) handleTcpipForward(req *ssh.Request) {
 	}
 
 	a1 := l.Addr()
-	log.Debugf("Listening port %s", a1)
+	log.Infof("Listening port %s", a1)
 	p := struct {
 		Port uint32
 	}{
@@ -445,7 +445,7 @@ func (sc *Server) handleTcpipForward(req *ssh.Request) {
 			log.Debugf("%s", err.Error())
 			return
 		}
-		log.Debugf("accept connection from %s", c.RemoteAddr())
+		log.Infof("accept connection from %s", c.RemoteAddr())
 		go func(c net.Conn) {
 			laddr := c.LocalAddr()
 			raddr := c.RemoteAddr()
