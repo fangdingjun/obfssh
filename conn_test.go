@@ -5,7 +5,14 @@ import (
 	"net"
 	"testing"
 	"time"
+
+	"github.com/fangdingjun/go-log"
 )
+
+func TestTimedOutConn(t *testing.T) {
+	testTimedOutConn(t, true)
+	testTimedOutConn(t, false)
+}
 
 func testTimedOutConn(t *testing.T, _timeout bool) {
 	l, err := net.Listen("tcp", "127.0.0.1:0")
@@ -23,7 +30,8 @@ func testTimedOutConn(t *testing.T, _timeout bool) {
 	go func() {
 		s, err := l.Accept()
 		if err != nil {
-			t.Fatalf("accept failed: %s", err)
+			log.Errorf("accept failed: %s", err)
+			return
 		}
 
 		defer s.Close()
@@ -34,7 +42,8 @@ func testTimedOutConn(t *testing.T, _timeout bool) {
 
 		n, err := sConn.Read(buf)
 		if err != nil {
-			t.Fatalf("server read failed: %s", err)
+			log.Errorf("server read failed: %s", err)
+			return
 		}
 
 		if _timeout {

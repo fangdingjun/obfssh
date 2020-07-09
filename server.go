@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
 	"os/exec"
 	"runtime"
 	"syscall"
 	"time"
 
+	"github.com/creack/pty"
 	"github.com/fangdingjun/go-log"
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
@@ -146,6 +148,22 @@ type exitStatus struct {
 	Status uint32
 }
 
+type ptyReq struct {
+	Term    string
+	Columns uint32
+	Rows    uint32
+	Width   uint32
+	Height  uint32
+	Mode    string
+}
+
+type windowChange struct {
+	Columns uint32
+	Rows    uint32
+	Width   uint32
+	Height  uint32
+}
+
 func (sc *Server) handleSession(newch ssh.NewChannel) {
 	ch, req, err := newch.Accept()
 	if err != nil {
@@ -153,11 +171,14 @@ func (sc *Server) handleSession(newch ssh.NewChannel) {
 		return
 	}
 
-	var _cmd args
-
 	ret := false
+
+	var _cmd args
 	var cmd *exec.Cmd
 	var env []string
+	var _ptyReq ptyReq
+	var _windowChange windowChange
+	var _pty, _tty *os.File
 
 	for r := range req {
 		switch r.Type {
@@ -168,6 +189,7 @@ func (sc *Server) handleSession(newch ssh.NewChannel) {
 					log.Debugf("handle sftp request")
 					go serveSFTP(ch)
 				} else {
+					ret = false
 					log.Debugln("subsystem", _cmd.Arg, "not support")
 				}
 			} else {
@@ -182,7 +204,7 @@ func (sc *Server) handleSession(newch ssh.NewChannel) {
 				cmd = exec.Command("bash", "-l")
 			}
 			cmd.Env = env
-			go handleShell(cmd, ch)
+			go handleShell(cmd, ch, _pty, _tty)
 		case "signal":
 			log.Debugln("got signal")
 			ret = true
@@ -204,6 +226,35 @@ func (sc *Server) handleSession(newch ssh.NewChannel) {
 			}
 		case "pty-req":
 			ret = true
+			err = ssh.Unmarshal(r.Payload, &_ptyReq)
+			if err != nil {
+				log.Errorln(err)
+				ret = false
+			}
+			log.Debugf("pty req %+v", _ptyReq)
+			if err == nil && (runtime.GOOS == "unix" || runtime.GOOS == "linux") {
+				_pty, _tty, err = pty.Open()
+				if err != nil {
+					log.Errorln(err)
+					ret = false
+				} else {
+					env = append(env, fmt.Sprintf("TERM=%s", _ptyReq.Term))
+					size, err := pty.GetsizeFull(_pty)
+					if err == nil {
+						log.Debugf("term size %+v", size)
+						size.Rows = uint16(_ptyReq.Rows)
+						size.Cols = uint16(_ptyReq.Columns)
+						if err = pty.Setsize(_pty, size); err != nil {
+							log.Errorln(err)
+						}
+						if err = pty.Setsize(_tty, size); err != nil {
+							log.Errorln(err)
+						}
+					} else {
+						log.Errorln(err)
+					}
+				}
+			}
 		case "env":
 			var arg envArgs
 			ret = true
@@ -216,6 +267,28 @@ func (sc *Server) handleSession(newch ssh.NewChannel) {
 			}
 		case "window-change":
 			ret = true
+			err = ssh.Unmarshal(r.Payload, &_windowChange)
+			if err != nil {
+				ret = false
+				log.Errorln(err)
+			}
+			if err == nil && _pty != nil {
+				size, err := pty.GetsizeFull(_pty)
+				if err == nil {
+					log.Debugf("term size %+v", size)
+					size.Rows = uint16(_ptyReq.Rows)
+					size.Cols = uint16(_ptyReq.Columns)
+					if err = pty.Setsize(_pty, size); err != nil {
+						log.Errorln(err)
+					}
+					if err = pty.Setsize(_tty, size); err != nil {
+						log.Errorln(err)
+					}
+				} else {
+					log.Errorln(err)
+				}
+			}
+			log.Debugf("window change %+v", _windowChange)
 		default:
 			ret = false
 		}
@@ -228,32 +301,36 @@ func (sc *Server) handleSession(newch ssh.NewChannel) {
 	}
 }
 
-func handleShell(cmd *exec.Cmd, ch ssh.Channel) {
-	defer ch.Close()
+func handleShell(cmd *exec.Cmd, ch ssh.Channel, _pty, _tty *os.File) {
+	defer func() {
+		ch.Close()
+		if _pty != nil {
+			_pty.Close()
+			_tty.Close()
+		}
+	}()
 
-	var _pty io.ReadWriteCloser
 	var err error
 
 	log.Infoln("start shell")
 
-	//_pty, err = pty.Start(cmd)
-	if runtime.GOOS == "unix" || runtime.GOOS == "linux" {
-		_pty, err = startPty(cmd)
-		if err != nil {
-			log.Debugln("start pty", err)
-			ch.SendRequest("exit-status", false,
-				ssh.Marshal(exitStatus{Status: 127}))
-			return
+	if _tty != nil {
+		cmd.Stderr = _tty
+		cmd.Stdout = _tty
+		cmd.Stdin = _tty
+		if cmd.SysProcAttr == nil {
+			cmd.SysProcAttr = &syscall.SysProcAttr{}
 		}
-	}
+		cmd.SysProcAttr.Setsid = true
+		cmd.SysProcAttr.Setctty = true
+		cmd.SysProcAttr.Ctty = int(_tty.Fd())
 
-	if runtime.GOOS == "unix" || runtime.GOOS == "linux" {
-		defer _pty.Close()
 		go io.Copy(ch, _pty)
 		go io.Copy(_pty, ch)
-	} else { // windows
+	} else {
 		cmd.Stderr = ch
 		cmd.Stdout = ch
+
 		in, err := cmd.StdinPipe()
 		if err != nil {
 			ch.SendRequest("exit-status", false,
@@ -263,14 +340,16 @@ func handleShell(cmd *exec.Cmd, ch ssh.Channel) {
 		go func() {
 			defer in.Close()
 			io.Copy(in, ch)
+
 		}()
-		if err := cmd.Start(); err != nil {
-			log.Debugln("start command ", err)
-			ch.SendRequest("exit-status", false,
-				ssh.Marshal(exitStatus{Status: 126}))
-			return
-		}
 	}
+	if err := cmd.Start(); err != nil {
+		log.Debugln("start command ", err)
+		ch.SendRequest("exit-status", false,
+			ssh.Marshal(exitStatus{Status: 126}))
+		return
+	}
+
 	code := 0
 	if err = cmd.Wait(); err != nil {
 		log.Debugln(err)

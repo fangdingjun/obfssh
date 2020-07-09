@@ -123,21 +123,20 @@ func (cc *Client) Close() {
 }
 
 // RunCmd run a single command on server
-func (cc *Client) RunCmd(cmd string) ([]byte, error) {
+func (cc *Client) RunCmd(cmd string) error {
 	log.Debugf("run command %s", cmd)
 	session, err := cc.client.NewSession()
 	if err != nil {
-		log.Debugf("command exited with error: %s", err.Error())
-	} else {
-		log.Debugf("command exited with no error")
+		log.Debugf("new session error: %s", err.Error())
+		return err
 	}
 
-	if err != nil {
-		return nil, err
-	}
-	d, err := session.CombinedOutput(cmd)
+	session.Stdin = os.Stdin
+	session.Stderr = os.Stderr
+	session.Stdout = os.Stdout
+	err = session.Run(cmd)
 	session.Close()
-	return d, err
+	return err
 }
 
 // Shell start a login shell on server

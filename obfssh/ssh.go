@@ -331,12 +331,9 @@ func main() {
 
 	if !cfg.NotRunCmd {
 		if cmd != "" {
-			if d, err := client.RunCmd(cmd); err != nil {
+			if err := client.RunCmd(cmd); err != nil {
 				log.Errorln(err)
 				hasErr = true
-			} else {
-				//log.Printf("%s", string(d))
-				fmt.Printf("%s", string(d))
 			}
 		} else {
 			if err := client.Shell(); err != nil {

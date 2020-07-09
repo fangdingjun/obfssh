@@ -152,7 +152,6 @@ func main() {
 					defer c.Close()
 					sc, err := obfssh.NewServer(c, config, sconf)
 					if err != nil {
-						c.Close()
 						log.Errorf("%s", err.Error())
 						return
 					}
