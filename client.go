@@ -168,20 +168,8 @@ func (cc *Client) Shell() error {
 		return err
 	}
 
-	ch := make(chan os.Signal, 2)
-	signal.Notify(ch, syscall.SIGWINCH)
-	go func() {
-		for {
-			select {
-			case <-ch:
-				ws, _ := _console.Size()
-				_winCh := windowChange{Rows: uint32(ws.Height), Columns: uint32(ws.Width)}
-				d := ssh.Marshal(_winCh)
-				ok, err := session.SendRequest("window-change", true, d)
-				log.Debugf("send window change request %+v %+v", ok, err)
-			}
-		}
-	}()
+	// register console change signal
+	consoleChange(_console, session)
 
 	session.Stdin = _console
 	session.Stdout = os.Stdout

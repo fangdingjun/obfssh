@@ -234,7 +234,7 @@ func (sc *Server) handleSession(newch ssh.NewChannel) {
 			}
 			log.Debugf("pty req %+v", _ptyReq)
 			if err == nil && (runtime.GOOS == "unix" || runtime.GOOS == "linux") {
-				_console, ptsname, err = console.NewPty()
+				_console, ptsname, err = newPty()
 				if err == nil {
 					log.Debugf("allocate pty %s", ptsname)
 					env = append(env, fmt.Sprintf("SSH_TTY=%s", ptsname))
@@ -321,9 +321,8 @@ func handleShell(cmd *exec.Cmd, ch ssh.Channel, _console console.Console, ptsnam
 		if cmd.SysProcAttr == nil {
 			cmd.SysProcAttr = &syscall.SysProcAttr{}
 		}
-		cmd.SysProcAttr.Setsid = true
-		cmd.SysProcAttr.Setctty = true
-		// cmd.SysProcAttr.Ctty = int(_tty.Fd())
+
+		setProcAttr(cmd.SysProcAttr)
 
 		go io.Copy(ch, _console)
 		go io.Copy(_console, ch)
