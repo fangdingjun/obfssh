@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fangdingjun/go-log"
+	"github.com/fangdingjun/go-log/v5"
 	socks "github.com/fangdingjun/socks-go"
 )
 

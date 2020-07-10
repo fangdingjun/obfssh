@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/bgentry/speakeasy"
-	"github.com/fangdingjun/go-log"
+	"github.com/fangdingjun/go-log/v5"
 	"github.com/fangdingjun/obfssh"
 	"github.com/kr/fs"
 	"github.com/pkg/sftp"

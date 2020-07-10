@@ -3,7 +3,7 @@ package obfssh
 import (
 	"io"
 
-	"github.com/fangdingjun/go-log"
+	"github.com/fangdingjun/go-log/v5"
 )
 
 // PipeAndClose pipe the data between c and s, close both when done

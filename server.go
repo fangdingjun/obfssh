@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/containerd/console"
-	"github.com/fangdingjun/go-log"
+	"github.com/fangdingjun/go-log/v5"
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 )

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fangdingjun/go-log"
+	"github.com/fangdingjun/go-log/v5"
 )
 
 func TestTimedOutConn(t *testing.T) {

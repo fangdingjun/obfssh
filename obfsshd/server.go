@@ -12,7 +12,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/fangdingjun/go-log"
+	"github.com/fangdingjun/go-log/v5"
 	"github.com/fangdingjun/obfssh"
 	"github.com/fangdingjun/protolistener"
 	"golang.org/x/crypto/ssh"

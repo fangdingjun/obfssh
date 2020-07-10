@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"io/ioutil"
 
-	"github.com/fangdingjun/go-log"
+	"github.com/fangdingjun/go-log/v5"
 	"github.com/go-yaml/yaml"
 	"golang.org/x/crypto/ssh"
 )
