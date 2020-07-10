@@ -14,10 +14,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/containerd/console"
 	"github.com/fangdingjun/go-log"
 	socks "github.com/fangdingjun/socks-go"
 	"golang.org/x/crypto/ssh"
-	"golang.org/x/crypto/ssh/terminal"
 )
 
 // Client is ssh client connection
@@ -147,30 +147,46 @@ func (cc *Client) Shell() error {
 		return err
 	}
 
-	session.Stdin = os.Stdin
-	session.Stdout = os.Stdout
-	session.Stderr = os.Stderr
 	modes := ssh.TerminalModes{
 		ssh.ECHO:          1,
 		ssh.TTY_OP_ISPEED: 14400,
 		ssh.TTY_OP_OSPEED: 14400,
 	}
 
+	_console := console.Current()
+	defer _console.Reset()
+
 	// this make CTRL+C works
 	log.Debugf("turn terminal mode to raw")
+	_console.SetRaw()
 
-	oldState, _ := terminal.MakeRaw(0)
-	defer func() {
-		log.Debugf("restore terminal mode")
-		terminal.Restore(0, oldState)
-	}()
+	ws, _ := _console.Size()
 
-	w, h, _ := terminal.GetSize(0)
 	log.Debugf("request pty")
-	if err := session.RequestPty("xterm", h, w, modes); err != nil {
+	if err := session.RequestPty("xterm", int(ws.Height), int(ws.Width), modes); err != nil {
 		log.Errorf("request pty error: %s", err.Error())
 		return err
 	}
+
+	ch := make(chan os.Signal, 2)
+	signal.Notify(ch, syscall.SIGWINCH)
+	go func() {
+		for {
+			select {
+			case <-ch:
+				ws, _ := _console.Size()
+				_winCh := windowChange{Rows: uint32(ws.Height), Columns: uint32(ws.Width)}
+				d := ssh.Marshal(_winCh)
+				ok, err := session.SendRequest("window-change", true, d)
+				log.Debugf("send window change request %+v %+v", ok, err)
+			}
+		}
+	}()
+
+	session.Stdin = _console
+	session.Stdout = os.Stdout
+	session.Stderr = os.Stderr
+
 	log.Debugf("request shell")
 	if err := session.Shell(); err != nil {
 		log.Errorf("start shell error: %s", err.Error())
