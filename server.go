@@ -217,10 +217,13 @@ func (sc *Server) handleSession(newch ssh.NewChannel) {
 		case "shell":
 			ret = true
 			if runtime.GOOS == "windows" {
+				env = append(env, fmt.Sprintf("SHELL=powershell"))
 				cmd = exec.Command("powershell")
 			} else {
-				cmd = exec.Command("bash", "-l")
+				env = append(env, fmt.Sprintf("SHELL=/bin/bash"))
+				cmd = exec.Command("/bin/bash", "-l")
 			}
+			env = append(env, fmt.Sprintf("HOME=/home/guest"))
 			cmd.Env = env
 			go handleShell(cmd, ch, _console, ptsname)
 		case "signal":
@@ -231,10 +234,13 @@ func (sc *Server) handleSession(newch ssh.NewChannel) {
 			if err = ssh.Unmarshal(r.Payload, &_cmd); err == nil {
 				log.Infoln("execute command", _cmd.Arg)
 				if runtime.GOOS == "windows" {
+					env = append(env, fmt.Sprintf("SHELL=powershell"))
 					cmd = exec.Command("powershell", "-Command", _cmd.Arg)
 				} else {
-					cmd = exec.Command("bash", "-c", _cmd.Arg)
+					env = append(env, fmt.Sprintf("SHELL=/bin/bash"))
+					cmd = exec.Command("/bin/bash", "-c", _cmd.Arg)
 				}
+				env = append(env, fmt.Sprintf("HOME=/home/guest"))
 				cmd.Env = env
 				//cmd.Stdin = ch
 				go handleCommand(cmd, ch)
@@ -261,6 +267,7 @@ func (sc *Server) handleSession(newch ssh.NewChannel) {
 						log.Errorln(err)
 					}
 					env = append(env, fmt.Sprintf("SSH_TTY=%s", ptsname))
+					env = append(env, fmt.Sprintf("TERM=%s", _ptyReq.Term))
 					ws, err := _console.Size()
 					if err != nil {
 						log.Errorln(err)
