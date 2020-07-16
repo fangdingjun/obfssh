@@ -1,6 +1,7 @@
 package obfssh
 
 import (
+	"encoding/binary"
 	"fmt"
 	"io"
 	"net"
@@ -164,6 +165,22 @@ type windowChange struct {
 	Height  uint32
 }
 
+func parseTerminalModes(s string) ssh.TerminalModes {
+	// log.Debugf("%x", s)
+	s1 := []byte(s)
+	t := ssh.TerminalModes{}
+	for i := 0; i < len(s1); i += 5 {
+		k := uint8(s1[i])
+		if k == 0 {
+			break
+		}
+		v := binary.BigEndian.Uint32(s1[i+1 : i+5])
+		t[k] = v
+		// log.Debugf("k %d, v %d", k, v)
+	}
+	return t
+}
+
 func (sc *Server) handleSession(newch ssh.NewChannel) {
 	ch, req, err := newch.Accept()
 	if err != nil {
@@ -232,11 +249,17 @@ func (sc *Server) handleSession(newch ssh.NewChannel) {
 				log.Errorln(err)
 				ret = false
 			}
-			log.Debugf("pty req %+v", _ptyReq)
+			log.Debugf("pty req Rows: %d, Columns: %d, Mode: %x", _ptyReq.Rows, _ptyReq.Columns, _ptyReq.Mode)
 			if err == nil && (runtime.GOOS == "unix" || runtime.GOOS == "linux") {
+				termios := parseTerminalModes(_ptyReq.Mode)
+				log.Debugf("parsed terminal mode %+v", termios)
 				_console, ptsname, err = newPty()
 				if err == nil {
 					log.Debugf("allocate pty %s", ptsname)
+					log.Debugf("set termios")
+					if err1 := setTermios(int(_console.Fd()), termios); err1 != nil {
+						log.Errorln(err)
+					}
 					env = append(env, fmt.Sprintf("SSH_TTY=%s", ptsname))
 					ws, err := _console.Size()
 					if err != nil {

@@ -20,3 +20,7 @@ func newPty() (console.Console, string, error) {
 
 func setProcAttr(attr *syscall.SysProcAttr) {
 }
+
+func setTermios(fd int, args ssh.TerminalModes) error {
+	return errors.New("not supported")
+}
