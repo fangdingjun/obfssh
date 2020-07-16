@@ -14,13 +14,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/bgentry/speakeasy"
 	"github.com/fangdingjun/go-log/v5"
 	"github.com/fangdingjun/obfssh"
 	"github.com/kr/fs"
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 type options struct {
@@ -577,8 +577,10 @@ func makeDirs(p string, c dirInterface) error {
 
 func passwordAuth() (string, error) {
 	// read password from console
-	s, err := speakeasy.Ask("Password: ")
-	return strings.Trim(s, " \r\n"), err
+	fmt.Fprintf(os.Stdout, "Password: ")
+	s, err := terminal.ReadPassword(int(os.Stdin.Fd()))
+	fmt.Fprintf(os.Stdout, "\n")
+	return strings.Trim(string(s), " \r\n"), err
 }
 
 //

@@ -11,11 +11,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bgentry/speakeasy"
 	"github.com/fangdingjun/go-log/v5"
 	"github.com/fangdingjun/obfssh"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 var dialer = &net.Dialer{Timeout: 15 * time.Second}
@@ -383,8 +383,10 @@ func keyboardAuth(user, instruction string, question []string, echos []bool) (an
 
 func passwordAuth() (string, error) {
 	// read password from console
-	s, err := speakeasy.Ask("Password: ")
-	return strings.Trim(s, " \r\n"), err
+	fmt.Fprintf(os.Stdout, "Password: ")
+	s, err := terminal.ReadPassword(int(os.Stdin.Fd()))
+	fmt.Fprintf(os.Stdout, "\n")
+	return strings.Trim(string(s), " \r\n"), err
 }
 
 func usage() {
