@@ -3,8 +3,12 @@
 package obfssh
 
 import (
+	"fmt"
 	"os"
+	"os/exec"
 	"os/signal"
+	"os/user"
+	"strconv"
 	"syscall"
 
 	"github.com/containerd/console"
@@ -97,4 +101,21 @@ func setTermios(fd int, args ssh.TerminalModes) error {
 	log.Debugf("after %+v", t1)
 
 	return nil
+}
+
+func setUserEnv(_cmd *exec.Cmd, u *user.User, attr *syscall.SysProcAttr) {
+	if u == nil {
+		return
+	}
+	_uid, _ := strconv.ParseUint(u.Uid, 10, 32)
+	_gid, _ := strconv.ParseUint(u.Gid, 10, 32)
+	if attr.Credential == nil {
+		attr.Credential = &syscall.Credential{}
+	}
+	attr.Credential.Uid = uint32(_uid)
+	attr.Credential.Gid = uint32(_gid)
+
+	_cmd.Env = append(_cmd.Env, fmt.Sprintf("HOME=%s", u.HomeDir))
+	_cmd.Env = append(_cmd.Env, fmt.Sprintf("LOGNAME=%s", u.Name))
+	_cmd.Dir = u.HomeDir
 }

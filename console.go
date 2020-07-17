@@ -4,6 +4,8 @@ package obfssh
 
 import (
 	"errors"
+	"os/exec"
+	"os/user"
 	"syscall"
 
 	"github.com/containerd/console"
@@ -23,4 +25,11 @@ func setProcAttr(attr *syscall.SysProcAttr) {
 
 func setTermios(fd int, args ssh.TerminalModes) error {
 	return errors.New("not supported")
+}
+
+func setUserEnv(_cmd *exec.Cmd, u *user.User, attr *syscall.SysProcAttr) {
+	if u == nil {
+		return
+	}
+	_cmd.Dir = u.HomeDir
 }
