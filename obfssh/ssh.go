@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -197,29 +198,36 @@ func main() {
 	// parse environment proxy
 	updateProxyFromEnv(&cfg)
 
-	rhost := net.JoinHostPort(host, fmt.Sprintf("%d", cfg.Port))
-
 	var c net.Conn
-	if cfg.Proxy.Scheme != "" && cfg.Proxy.Host != "" && cfg.Proxy.Port != 0 {
-		switch cfg.Proxy.Scheme {
-		case "http":
-			log.Debugf("use http proxy %s:%d to connect to server",
-				cfg.Proxy.Host, cfg.Proxy.Port)
-			c, err = dialHTTPProxy(host, cfg.Port, cfg.Proxy)
-		case "https":
-			log.Debugf("use https proxy %s:%d to connect to server",
-				cfg.Proxy.Host, cfg.Proxy.Port)
-			c, err = dialHTTPSProxy(host, cfg.Port, cfg.Proxy)
-		case "socks5":
-			log.Debugf("use socks proxy %s:%d to connect to server",
-				cfg.Proxy.Host, cfg.Proxy.Port)
-			c, err = dialSocks5Proxy(host, cfg.Port, cfg.Proxy)
-		default:
-			err = fmt.Errorf("unsupported scheme: %s", cfg.Proxy.Scheme)
-		}
+	var rhost string
+
+	if strings.HasPrefix(host, "ws://") || strings.HasPrefix(host, "wss://") {
+		c, err = obfssh.NewWSConn(host)
+		u, _ := url.Parse(host)
+		rhost = u.Host
 	} else {
-		log.Debugf("dail to %s", rhost)
-		c, err = dialer.Dial("tcp", rhost)
+		rhost = net.JoinHostPort(host, fmt.Sprintf("%d", cfg.Port))
+		if cfg.Proxy.Scheme != "" && cfg.Proxy.Host != "" && cfg.Proxy.Port != 0 {
+			switch cfg.Proxy.Scheme {
+			case "http":
+				log.Debugf("use http proxy %s:%d to connect to server",
+					cfg.Proxy.Host, cfg.Proxy.Port)
+				c, err = dialHTTPProxy(host, cfg.Port, cfg.Proxy)
+			case "https":
+				log.Debugf("use https proxy %s:%d to connect to server",
+					cfg.Proxy.Host, cfg.Proxy.Port)
+				c, err = dialHTTPSProxy(host, cfg.Port, cfg.Proxy)
+			case "socks5":
+				log.Debugf("use socks proxy %s:%d to connect to server",
+					cfg.Proxy.Host, cfg.Proxy.Port)
+				c, err = dialSocks5Proxy(host, cfg.Port, cfg.Proxy)
+			default:
+				err = fmt.Errorf("unsupported scheme: %s", cfg.Proxy.Scheme)
+			}
+		} else {
+			log.Debugf("dail to %s", rhost)
+			c, err = dialer.Dial("tcp", rhost)
+		}
 	}
 
 	if err != nil {
