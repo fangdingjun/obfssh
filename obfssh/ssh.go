@@ -117,13 +117,7 @@ func main() {
 			defer agentConn.Close()
 			log.Debugf("add auth method with agent %s", os.Getenv("SSH_AUTH_SOCK"))
 			agentClient = agent.NewClient(agentConn)
-			//auth = append(auth, ssh.PublicKeysCallback(agentClient.Signers))
-			signers, err := agentClient.Signers()
-			if err == nil {
-				pkeys = append(pkeys, signers...)
-			} else {
-				log.Debugf("get key from agent failed: %s", err)
-			}
+			auth = append(auth, ssh.PublicKeysCallback(agentClient.Signers))
 		} else {
 			log.Debugf("connect to agent failed")
 		}

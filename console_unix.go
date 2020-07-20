@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"os/user"
 	"strconv"
+	"strings"
 	"syscall"
 
 	"github.com/containerd/console"
@@ -109,13 +110,29 @@ func setUserEnv(_cmd *exec.Cmd, u *user.User, attr *syscall.SysProcAttr) {
 	}
 	_uid, _ := strconv.ParseUint(u.Uid, 10, 32)
 	_gid, _ := strconv.ParseUint(u.Gid, 10, 32)
-	if attr.Credential == nil {
-		attr.Credential = &syscall.Credential{}
-	}
-	attr.Credential.Uid = uint32(_uid)
-	attr.Credential.Gid = uint32(_gid)
 
 	_cmd.Env = append(_cmd.Env, fmt.Sprintf("HOME=%s", u.HomeDir))
 	_cmd.Env = append(_cmd.Env, fmt.Sprintf("LOGNAME=%s", u.Name))
 	_cmd.Dir = u.HomeDir
+
+	if os.Getuid() != 0 {
+		return
+	}
+
+	if attr.Credential == nil {
+		attr.Credential = &syscall.Credential{}
+	}
+
+	attr.Credential.Uid = uint32(_uid)
+	attr.Credential.Gid = uint32(_gid)
+	for _, _env := range _cmd.Env {
+		ss := strings.Split(_env, "=")
+		if ss[0] == "SSH_AUTH_SOCK" {
+			os.Chown(ss[1], int(_uid), int(_gid))
+		}
+		if ss[0] == "SSH_TTY" {
+			os.Chown(ss[1], int(_uid), 0)
+		}
+	}
+
 }

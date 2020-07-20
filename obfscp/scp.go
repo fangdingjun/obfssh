@@ -102,13 +102,7 @@ func createSFTPConn(host, user string, cfg *options) (*sftp.Client, error) {
 	if cfg.Passwd == "" && cfg.PrivateKey == "" {
 		var pkeys []ssh.Signer
 		if aconn, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK")); err == nil {
-			//auths = append(auths, ssh.PublicKeysCallback(agent.NewClient(aconn).Signers))
-			if signers, err := agent.NewClient(aconn).Signers(); err == nil {
-				log.Debugf("add private key from agent")
-				pkeys = append(pkeys, signers...)
-			} else {
-				log.Debugf("get key from agent failed: %s", err)
-			}
+			auths = append(auths, ssh.PublicKeysCallback(agent.NewClient(aconn).Signers))
 		} else {
 			log.Debugf("dial to agent failed: %s", err)
 		}

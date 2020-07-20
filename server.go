@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"os"
 	"os/exec"
@@ -322,6 +323,50 @@ func (s *session) handleWindowChange(payload []byte) bool {
 	return true
 }
 
+func (sc *Server) handleAuthAgentForward(sess *session) bool {
+	f, err := ioutil.TempFile("", "agent-")
+	if err != nil {
+		log.Errorln(err)
+		return false
+	}
+
+	p := f.Name()
+	f.Close()
+	os.Remove(p)
+
+	l, err := net.Listen("unix", p)
+	if err != nil {
+		log.Errorln(err)
+		return false
+	}
+
+	sess.env = append(sess.env, fmt.Sprintf("SSH_AUTH_SOCK=%s", p))
+
+	sc.forwardedPorts[p] = l
+
+	go func() {
+		defer os.Remove(p)
+		for {
+			c, err := l.Accept()
+			if err != nil {
+				log.Errorln(err)
+				break
+			}
+			go func(c net.Conn) {
+				ch, req, err := sc.sshConn.OpenChannel("auth-agent@openssh.com", nil)
+				if err != nil {
+					c.Close()
+					log.Errorln(err)
+					return
+				}
+				go ssh.DiscardRequests(req)
+				PipeAndClose(ch, c)
+			}(c)
+		}
+	}()
+	return true
+}
+
 func (sc *Server) handleSession(newch ssh.NewChannel) {
 	ch, req, err := newch.Accept()
 	if err != nil {
@@ -346,6 +391,8 @@ func (sc *Server) handleSession(newch ssh.NewChannel) {
 			ret = sess.handleEnv(r.Payload)
 		case "window-change":
 			ret = sess.handleWindowChange(r.Payload)
+		case "auth-agent-req@openssh.com":
+			ret = sc.handleAuthAgentForward(sess)
 		case "signal":
 			log.Debugln("got signal")
 			ret = true
