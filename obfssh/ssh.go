@@ -86,6 +86,7 @@ func main() {
 
 	var agentConn net.Conn
 	var err error
+	var agentClient agent.ExtendedAgent
 
 	// read ssh agent and default auth key
 	if cfg.Password == "" && cfg.PrivateKey == "" {
@@ -115,7 +116,7 @@ func main() {
 		if err == nil {
 			defer agentConn.Close()
 			log.Debugf("add auth method with agent %s", os.Getenv("SSH_AUTH_SOCK"))
-			agentClient := agent.NewClient(agentConn)
+			agentClient = agent.NewClient(agentConn)
 			//auth = append(auth, ssh.PublicKeysCallback(agentClient.Signers))
 			signers, err := agentClient.Signers()
 			if err == nil {
@@ -267,6 +268,10 @@ func main() {
 	}
 
 	log.Debugf("ssh negotation success")
+
+	if agentClient != nil {
+		client.SetAuthAgent(agentClient)
+	}
 
 	var local, remote string
 

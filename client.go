@@ -18,6 +18,7 @@ import (
 	"github.com/fangdingjun/go-log/v5"
 	socks "github.com/fangdingjun/socks-go"
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/agent"
 )
 
 // Client is ssh client connection
@@ -29,6 +30,7 @@ type Client struct {
 	err       error
 	ctx       context.Context
 	cancel    context.CancelFunc
+	authAgent agent.ExtendedAgent
 }
 
 // NewClient create a new ssh Client
@@ -52,6 +54,11 @@ func NewClient(c net.Conn, config *ssh.ClientConfig, addr string, conf *Conf) (*
 	client.ctx, client.cancel = context.WithCancel(context.Background())
 	go client.keepAlive(conf.KeepAliveInterval, conf.KeepAliveMax)
 	return client, nil
+}
+
+// SetAuthAgent set auth agent
+func (cc *Client) SetAuthAgent(_agent agent.ExtendedAgent) {
+	cc.authAgent = _agent
 }
 
 // Client return *ssh.Client
@@ -166,6 +173,17 @@ func (cc *Client) Shell() error {
 	if err := session.RequestPty("xterm", int(ws.Height), int(ws.Width), modes); err != nil {
 		log.Errorf("request pty error: %s", err.Error())
 		return err
+	}
+
+	if cc.authAgent != nil {
+		log.Debugln("request auth agent forwarding")
+		if err = agent.RequestAgentForwarding(session); err == nil {
+			if err1 := agent.ForwardToAgent(cc.client, cc.authAgent); err1 != nil {
+				log.Debugln(err)
+			}
+		} else {
+			log.Debugln(err)
+		}
 	}
 
 	// register console change signal
