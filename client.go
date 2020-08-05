@@ -71,21 +71,22 @@ func (cc *Client) Run() error {
 	defer cc.Close()
 	defer cc.cancel()
 
+	go cc.registerSignal()
+
 	select {
 	case <-time.After(1 * time.Second):
 	}
 	// wait port forward to finish
 	if cc.listeners != nil {
 		log.Debugf("wait all channel to be done")
-		go cc.registerSignal()
 		go func() {
 			cc.err = cc.sshConn.Wait()
 			log.Debugf("connection hang up")
 			cc.cancel()
 			//close(cc.ch)
 		}()
-		<-cc.ctx.Done()
 	}
+	<-cc.ctx.Done()
 	return cc.err
 }
 
@@ -131,34 +132,49 @@ func (cc *Client) Close() {
 
 // RunCmd run a single command on server
 func (cc *Client) RunCmd(cmd string) error {
+	go cc.runCmd(cmd)
+	return nil
+}
+
+func (cc *Client) runCmd(cmd string) error {
+	defer cc.cancel()
 	log.Debugf("run command %s", cmd)
 	session, err := cc.client.NewSession()
 	if err != nil {
 		log.Debugf("new session error: %s", err.Error())
+		cc.err = err
 		return err
 	}
+	defer session.Close()
 
 	session.Stdin = os.Stdin
 	session.Stderr = os.Stderr
 	session.Stdout = os.Stdout
-	err = session.Run(cmd)
-	session.Close()
-	return err
+	if err = session.Run(cmd); err != nil {
+		cc.err = err
+		return err
+	}
+	return nil
 }
 
 // Shell start a login shell on server
 func (cc *Client) Shell() error {
+	go cc.shell()
+	return nil
+}
+
+func (cc *Client) shell() error {
+	defer cc.cancel()
+
 	log.Debugf("request new session")
 	session, err := cc.client.NewSession()
 	if err != nil {
+		cc.err = err
 		return err
 	}
+	defer session.Close()
 
-	modes := ssh.TerminalModes{
-		ssh.ECHO:          1,
-		ssh.TTY_OP_ISPEED: 14400,
-		ssh.TTY_OP_OSPEED: 14400,
-	}
+	modes := ssh.TerminalModes{}
 
 	_console := console.Current()
 	defer _console.Reset()
@@ -172,6 +188,7 @@ func (cc *Client) Shell() error {
 	log.Debugf("request pty")
 	if err := session.RequestPty("xterm", int(ws.Height), int(ws.Width), modes); err != nil {
 		log.Errorf("request pty error: %s", err.Error())
+		cc.err = err
 		return err
 	}
 
@@ -179,7 +196,7 @@ func (cc *Client) Shell() error {
 		log.Debugln("request auth agent forwarding")
 		if err = agent.RequestAgentForwarding(session); err == nil {
 			if err1 := agent.ForwardToAgent(cc.client, cc.authAgent); err1 != nil {
-				log.Debugln(err)
+				log.Debugln(err1)
 			}
 		} else {
 			log.Debugln(err)
@@ -196,11 +213,24 @@ func (cc *Client) Shell() error {
 	log.Debugf("request shell")
 	if err := session.Shell(); err != nil {
 		log.Errorf("start shell error: %s", err.Error())
+		cc.err = err
 		return err
 	}
 
-	session.Wait()
-	log.Debugf("session closed")
+	ch := make(chan struct{}, 1)
+	go func() {
+		if err = session.Wait(); err != nil {
+			log.Errorln(err)
+			cc.err = err
+		}
+		log.Debugf("session closed")
+		ch <- struct{}{}
+	}()
+
+	select {
+	case <-ch:
+	case <-cc.ctx.Done():
+	}
 	return nil
 }
 
