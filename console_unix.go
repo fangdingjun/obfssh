@@ -1,3 +1,4 @@
+//go:build darwin || freebsd || linux || openbsd || solaris
 // +build darwin freebsd linux openbsd solaris
 
 package obfssh

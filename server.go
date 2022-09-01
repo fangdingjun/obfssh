@@ -34,8 +34,6 @@ type Server struct {
 // config is &ssh.ServerConfig
 //
 // conf is the server configure
-//
-//
 func NewServer(c net.Conn, config *ssh.ServerConfig, conf *Conf) (*Server, error) {
 	sshConn, ch, req, err := ssh.NewServerConn(&TimedOutConn{c, 15 * 60 * time.Second}, config)
 	if err != nil {
@@ -211,10 +209,10 @@ func (s *session) handleSubsystem(payload []byte) bool {
 func (s *session) handleShell() bool {
 	var cmd *exec.Cmd
 	if runtime.GOOS == "windows" {
-		s.env = append(s.env, fmt.Sprintf("SHELL=powershell"))
+		s.env = append(s.env, "SHELL=powershell")
 		cmd = exec.Command("powershell")
 	} else {
-		s.env = append(s.env, fmt.Sprintf("SHELL=/bin/bash"))
+		s.env = append(s.env, "SHELL=/bin/bash")
 		cmd = exec.Command("/bin/bash", "-l")
 	}
 	s.cmd = cmd
@@ -232,10 +230,10 @@ func (s *session) handleExec(payload []byte) bool {
 	}
 	log.Infoln("execute command", _cmd.Arg)
 	if runtime.GOOS == "windows" {
-		s.env = append(s.env, fmt.Sprintf("SHELL=powershell"))
+		s.env = append(s.env, "SHELL=powershell")
 		cmd = exec.Command("powershell", "-Command", _cmd.Arg)
 	} else {
-		s.env = append(s.env, fmt.Sprintf("SHELL=/bin/bash"))
+		s.env = append(s.env, "SHELL=/bin/bash")
 		cmd = exec.Command("/bin/bash", "-c", _cmd.Arg)
 	}
 	s.cmd = cmd
@@ -273,7 +271,7 @@ func (s *session) handlePtyReq(payload []byte) bool {
 	s.env = append(s.env, fmt.Sprintf("SSH_TTY=%s", s.ptsname))
 	s.env = append(s.env, fmt.Sprintf("TERM=%s", _ptyReq.Term))
 
-	ws, err := s._console.Size()
+	ws, _ := s._console.Size()
 	log.Debugf("current console %+v", ws)
 	ws.Height = uint16(_ptyReq.Rows)
 	ws.Width = uint16(_ptyReq.Columns)
@@ -566,7 +564,7 @@ func (sc *Server) handleTcpipForward(req *ssh.Request) {
 		return
 	}
 
-	if addr.Port > 65535 || addr.Port < 0 {
+	if addr.Port > 65535 {
 		log.Errorf("invalid port %d", addr.Port)
 		if req.WantReply {
 			req.Reply(false, nil)

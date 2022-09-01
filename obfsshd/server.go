@@ -74,7 +74,7 @@ func main() {
 					if u, err := conf.getUser(c.User()); err == nil {
 						for _, pk := range u.publicKeys {
 							if k.Type() == pk.Type() &&
-								bytes.Compare(k.Marshal(), pk.Marshal()) == 0 {
+								bytes.Equal(k.Marshal(), pk.Marshal()) {
 								return true
 							}
 						}

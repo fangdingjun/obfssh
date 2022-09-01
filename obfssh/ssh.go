@@ -233,13 +233,11 @@ func main() {
 
 	timeout := time.Duration(cfg.KeepaliveInterval*2) * time.Second
 
-	var _conn = c
-
-	conn := &obfssh.TimedOutConn{Conn: c, Timeout: timeout}
+	var _conn net.Conn = &obfssh.TimedOutConn{Conn: c, Timeout: timeout}
 
 	if cfg.TLS {
 		log.Debugf("begin tls handshake")
-		_conn = tls.Client(conn, &tls.Config{
+		_conn = tls.Client(_conn, &tls.Config{
 			ServerName:         host,
 			InsecureSkipVerify: cfg.TLSInsecure,
 		})
@@ -310,7 +308,7 @@ func main() {
 	}
 	for _, p := range cfg.DynamicForwards {
 
-		if strings.Index(p, ":") == -1 {
+		if !strings.Contains(p, ":") {
 			local = fmt.Sprintf(":%s", p)
 		} else {
 			local = p
@@ -322,7 +320,7 @@ func main() {
 	}
 
 	for _, p := range cfg.DynamicHTTP {
-		if strings.Index(p, ":") == -1 {
+		if !strings.Contains(p, ":") {
 			local = fmt.Sprintf(":%s", p)
 		} else {
 			local = p
@@ -363,10 +361,7 @@ func main() {
 
 func parseForwardAddr(s string) []string {
 	ss := strings.FieldsFunc(s, func(c rune) bool {
-		if c == ':' {
-			return true
-		}
-		return false
+		return c == ':'
 	})
 	return ss
 }
