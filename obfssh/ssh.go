@@ -34,7 +34,6 @@ func main() {
 	flag.StringVar(&cfg.Password, "pw", "", "ssh password")
 	flag.IntVar(&cfg.Port, "p", 22, "remote port")
 	flag.StringVar(&cfg.PrivateKey, "i", "", "private key file")
-	flag.BoolVar(&cfg.TLS, "tls", false, "use tls or not")
 	flag.BoolVar(&cfg.TLSInsecure, "tls-insecure", false, "insecure tls connnection")
 	flag.Var(&cfg.LocalForwards, "L", "forward local port to remote, format [local_host:]local_port:remote_host:remote_port")
 	flag.Var(&cfg.RemoteForwards, "R", "forward remote port to local, format [remote_host:]remote_port:local_host:local_port")
@@ -148,10 +147,13 @@ func main() {
 		cmd = strings.Join(args, " ")
 	}
 
+	var serverName string
 	if strings.Contains(host, "@") {
-		ss := strings.SplitN(host, "@", 2)
-		cfg.Username = ss[0]
-		host = ss[1]
+		u, _ := url.Parse(host)
+		cfg.Username = u.User.Username()
+		u.User = nil
+		host = u.String()
+		serverName, _, _ = net.SplitHostPort(u.Host)
 	}
 
 	// process user specified private key
@@ -193,59 +195,7 @@ func main() {
 	// parse environment proxy
 	updateProxyFromEnv(&cfg)
 
-	var c net.Conn
-	var rhost string
-
-	if strings.HasPrefix(host, "ws://") || strings.HasPrefix(host, "wss://") {
-		c, err = obfssh.NewWSConn(host)
-		u, _ := url.Parse(host)
-		rhost = u.Host
-	} else {
-		rhost = net.JoinHostPort(host, fmt.Sprintf("%d", cfg.Port))
-		if cfg.Proxy.Scheme != "" && cfg.Proxy.Host != "" && cfg.Proxy.Port != 0 {
-			switch cfg.Proxy.Scheme {
-			case "http":
-				log.Debugf("use http proxy %s:%d to connect to server",
-					cfg.Proxy.Host, cfg.Proxy.Port)
-				c, err = dialHTTPProxy(host, cfg.Port, cfg.Proxy)
-			case "https":
-				log.Debugf("use https proxy %s:%d to connect to server",
-					cfg.Proxy.Host, cfg.Proxy.Port)
-				c, err = dialHTTPSProxy(host, cfg.Port, cfg.Proxy)
-			case "socks5":
-				log.Debugf("use socks proxy %s:%d to connect to server",
-					cfg.Proxy.Host, cfg.Proxy.Port)
-				c, err = dialSocks5Proxy(host, cfg.Port, cfg.Proxy)
-			default:
-				err = fmt.Errorf("unsupported scheme: %s", cfg.Proxy.Scheme)
-			}
-		} else {
-			log.Debugf("dail to %s", rhost)
-			c, err = dialer.Dial("tcp", rhost)
-		}
-	}
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	log.Debugf("dail success")
-
 	timeout := time.Duration(cfg.KeepaliveInterval*2) * time.Second
-
-	var _conn net.Conn = &obfssh.TimedOutConn{Conn: c, Timeout: timeout}
-
-	if cfg.TLS {
-		log.Debugf("begin tls handshake")
-		_conn = tls.Client(_conn, &tls.Config{
-			ServerName:         host,
-			InsecureSkipVerify: cfg.TLSInsecure,
-		})
-		if err := _conn.(*tls.Conn).Handshake(); err != nil {
-			log.Fatal(err)
-		}
-		log.Debugf("tls handshake done")
-	}
 
 	conf := &obfssh.Conf{
 		Timeout:           timeout,
@@ -253,13 +203,24 @@ func main() {
 		KeepAliveMax:      cfg.KeepaliveMax,
 	}
 
-	log.Debugf("ssh negotation")
-	client, err := obfssh.NewClient(_conn, config, rhost, conf)
+	dialer := &obfssh.Dialer{
+		Proxy: func() (*url.URL, error) {
+			if cfg.Proxy.Scheme != "" && cfg.Proxy.Host != "" && cfg.Proxy.Port != 0 {
+				return &url.URL{
+					Scheme: cfg.Proxy.Scheme,
+					Host:   fmt.Sprintf("%s:%d", cfg.Proxy.Host, cfg.Proxy.Port),
+				}, nil
+			}
+			return nil, nil
+		},
+		TLSClientConfig: &tls.Config{ServerName: serverName, InsecureSkipVerify: cfg.TLSInsecure},
+		NetConf:         conf,
+	}
+
+	client, err := dialer.Dial(host, config)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	log.Debugf("ssh negotation success")
 
 	if agentClient != nil {
 		client.SetAuthAgent(agentClient)
@@ -394,13 +355,19 @@ func passwordAuth() (string, error) {
 func usage() {
 	usageStr := `Usage:
   obfssh -N -d -D [bind_address:]port -f configfile
-   -tls -tls-insecure -log_file /path/to/file
+    -tls-insecure -log_file /path/to/file
    -log_count 10 -log_size 10
    -log_level INFO
    -i identity_file -L [bind_address:]port:host:hostport
    -l login_name -pw password -p port 
    -http [bind_addr:]port
-   -R [bind_address:]port:host:hostport [user@]hostname [command]
+   -R [bind_address:]port:host:hostport host [command]
+
+   host can be multiple forms, example:
+		user@example.com 
+		tls://hostname
+		ws://hostname/path
+		wss://hostname/path
 
 Options:
     -d verbose mode
@@ -461,11 +428,8 @@ Options:
        encrypt ssh connection
        similar like -D, but input is http, not socks5
 
-    -tls
-       connect to server via TLS
-
     -tls-insecure
-       do not verify server's tls ceritificate
+       do not verify server's tls ceritificate when use tls:// or wss://
        
     -log_file
        log file, default stdout

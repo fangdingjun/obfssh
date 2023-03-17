@@ -3,14 +3,12 @@ package obfssh
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"io"
 	"net"
-	"net/http"
 	"sync"
 	"time"
 
-	"github.com/fangdingjun/go-log/v5"
+	log "github.com/fangdingjun/go-log/v5"
 	"github.com/gorilla/websocket"
 )
 
@@ -22,29 +20,6 @@ type wsConn struct {
 }
 
 var _ net.Conn = &wsConn{}
-
-// NewWSConn dial to websocket server and return net.Conn
-func NewWSConn(p string) (net.Conn, error) {
-	conn, resp, err := websocket.DefaultDialer.Dial(p, nil)
-	if err != nil {
-		return nil, err
-	}
-	resp.Body.Close()
-
-	if resp.StatusCode != http.StatusSwitchingProtocols {
-		return nil, fmt.Errorf("http status %d", resp.StatusCode)
-	}
-
-	c := &wsConn{Conn: conn,
-		buf: bytes.NewBuffer(nil),
-		mu:  new(sync.Mutex),
-		ch:  make(chan struct{}),
-	}
-
-	go c.readLoop()
-
-	return c, nil
-}
 
 func (wc *wsConn) readLoop() {
 	for {
