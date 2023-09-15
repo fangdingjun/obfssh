@@ -1,14 +1,12 @@
 package obfssh
 
 import (
-	"bytes"
 	"context"
 	"crypto/tls"
 	"fmt"
 	"net"
 	"net/http"
 	"net/url"
-	"sync"
 	"time"
 
 	log "github.com/fangdingjun/go-log/v5"
@@ -110,8 +108,7 @@ func (d *Dialer) Dial(addr string, conf *ssh.ClientConfig) (*Client, error) {
 		if res.StatusCode != http.StatusSwitchingProtocols {
 			return nil, fmt.Errorf("websocket connect failed, http code %d", res.StatusCode)
 		}
-		_conn := &wsConn{Conn: wsconn, buf: new(bytes.Buffer), mu: new(sync.Mutex), ch: make(chan struct{})}
-		go _conn.readLoop()
+		_conn := &wsConn{Conn: wsconn}
 		return NewClient(_conn, conf, u.Host, d.NetConf)
 	default:
 		return nil, fmt.Errorf("unknow scheme %s", u.Scheme)

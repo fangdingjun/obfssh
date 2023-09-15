@@ -1,72 +1,43 @@
 package obfssh
 
 import (
-	"bytes"
-	"errors"
 	"io"
 	"net"
-	"sync"
 	"time"
 
-	log "github.com/fangdingjun/go-log/v5"
 	"github.com/gorilla/websocket"
 )
 
 type wsConn struct {
 	*websocket.Conn
-	buf *bytes.Buffer
-	mu  *sync.Mutex
-	ch  chan struct{}
+	r io.Reader
 }
 
 var _ net.Conn = &wsConn{}
 
-func (wc *wsConn) readLoop() {
-	for {
-		_, data, err := wc.ReadMessage()
-		if err != nil {
-			log.Debugln(err)
-			close(wc.ch)
-			break
-		}
-
-		wc.mu.Lock()
-		wc.buf.Write(data)
-		wc.mu.Unlock()
-
-		select {
-		case wc.ch <- struct{}{}:
-		default:
-		}
-	}
-}
-
 func (wc *wsConn) Read(buf []byte) (int, error) {
-	wc.mu.Lock()
-
-	n, err := wc.buf.Read(buf)
-	if err == nil {
-		wc.mu.Unlock()
+	for {
+		if wc.r == nil {
+			_, r, err := wc.NextReader()
+			if err != nil {
+				return 0, err
+			}
+			wc.r = r
+		}
+		n, err := wc.r.Read(buf)
+		if err != nil {
+			wc.r = nil
+			if err == io.EOF {
+				// current message is read out
+				if n > 0 {
+					return n, nil
+				}
+				// no data, read next message
+				continue
+			}
+		}
 		return n, err
 	}
-
-	wc.mu.Unlock()
-
-	if err != io.EOF {
-		return 0, err
-	}
-
-	// EOF, no data avaliable, read again
-	select {
-	case _, ok := <-wc.ch:
-		if !ok {
-			return 0, errors.New("connection closed")
-		}
-	}
-
-	wc.mu.Lock()
-	defer wc.mu.Unlock()
-	return wc.buf.Read(buf)
 }
 
 func (wc *wsConn) Write(buf []byte) (int, error) {
