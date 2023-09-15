@@ -12,5 +12,5 @@ require (
 	github.com/kr/fs v0.1.0
 	github.com/pkg/sftp v1.11.0
 	golang.org/x/crypto v0.0.0-20200709230013-948cd5f35899
-	golang.org/x/sys v0.0.0-20210124154548-22da62e12c0c
+	golang.org/x/sys v0.1.0
 )
