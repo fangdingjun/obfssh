@@ -10,7 +10,9 @@ require (
 	github.com/go-yaml/yaml v2.1.0+incompatible
 	github.com/gorilla/websocket v1.5.0
 	github.com/kr/fs v0.1.0
-	github.com/pkg/sftp v1.11.0
-	golang.org/x/crypto v0.1.0
-	golang.org/x/sys v0.1.0
+	github.com/pires/go-proxyproto v0.7.0 // indirect
+	github.com/pkg/sftp v1.13.6
+	golang.org/x/crypto v0.13.0
+	golang.org/x/sys v0.12.0
+	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
